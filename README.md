@@ -1,3 +1,3 @@
 # Sandra_tcs-devop-project-C
-Local K3s cluster with Helm, Prometheus and Grafana monitoring
 
+Deploy an app to a local K3s cluster, package with Helm, use Prometheus and Grafana for monitoring.
