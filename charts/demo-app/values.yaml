@@ -1,0 +1,10 @@
+replicaCount: 1
+
+image:
+  repository: demo-app
+  tag: v.1.0
+  pullPolicy: Never
+
+service:
+  type: ClusterIP
+  port: 8085
