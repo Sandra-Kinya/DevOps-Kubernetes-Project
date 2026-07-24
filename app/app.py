@@ -1,9 +1,13 @@
 from flask import Flask
+import  os
+
 app = Flask(__name__)
+
+GREETING = os.environ.get("APP_GREETING", "Hello from Kubernetes + Helm!")
 
 @app.route('/')
 def hello():
-    return "Hello from Kubernetes + Helm!"
+    return GREETING
 
 @app.route('/metrics')
 def metrics():

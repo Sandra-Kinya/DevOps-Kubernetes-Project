@@ -18,3 +18,7 @@ spec:
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         ports:
         - containerPort: 8085
+
+        envFrom:
+        - configMapRef:
+            name: {{ include "demo-app.fullname" . }}-config

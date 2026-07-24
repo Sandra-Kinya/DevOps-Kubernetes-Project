@@ -8,3 +8,6 @@ image:
 service:
   type: ClusterIP
   port: 8085
+
+config:
+  appGreeting: "Hello from Kubernetes + Helm!"
