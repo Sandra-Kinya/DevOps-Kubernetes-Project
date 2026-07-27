@@ -123,3 +123,33 @@ c) Edit deployment.yaml - Add an envFrom block under the existing container spec
 d) Apply the changes
 cd ~/Sandra_tcs-devop-project-C
 helm upgrade demo-app ./charts/demo-app
+
+*** Challenges encountered
+
+Port is already allocated
+Solution: I used port 8085 since port 8080 is currently being used by Jenkins.
+
+Error calling include
+Solution: I created _helpers.tpl to store reusable template functions and naming rules.
+
+Helm reported "Install complete" but no pods or services were created
+Finding: The templates folder was misspelled "template" instead of "templates".
+Solution: mv template templates, then re-ran helm upgrade.
+
+ErrImageNeverPull - pod stuck, image not found
+Finding: values.yaml requested image tag "latest", but only "v1.0" existed in
+k3s's containerd store.
+Solution: Updating values.yaml to reference the tag that actually existed.
+
+Tag mismatch between Docker and containerd (v1.0 vs v.1.0)
+Finding: Docker's local image store had the image tagged "v.1.0" (with a dot),
+while containerd's k8s.io namespace had it imported as "v1.0" (no dot) 
+Solution: Standardized on "v.1.0" across values.yaml, the Docker build
+command, and the containerd import command.
+
+git push rejected - divergent branches
+Finding: I edited the readme file using GUI, commited the changes and forgot to pull the repo when working on the project. Thus the remote repo had commits not present locally. 
+Solution:
+  git config pull.rebase false
+  git pull
+  git push
