@@ -98,8 +98,11 @@ curl http://demo.local:31865/
 
 STEP 14: DEMONSTRATE SELF HEALING
 Kubernetes checks if there is exactly one healthy running pod (replicas:1) 
+
 a) Confirm current health state: kubectl get pods
+
 b) Kill pod: kubectl delete pod 
+
 c) Immediately check pod status again: kubectl get pods
 A new pod appears automatically 
 ***Self healing demonstration https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/SelfHealing.mp4
