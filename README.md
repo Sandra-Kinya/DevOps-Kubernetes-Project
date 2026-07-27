@@ -82,8 +82,31 @@ kubectl port-forward svc/demo-app-demo-app 8085:8085
 curl http://localhost:8085/
 curl http://localhost:8085/metrics
 
+STEP 13: TESTING INGRESS
+I used K3s default traefik.
+a) Confirm traefik is running: kubectl get pods -n kube-system | grep traefik 
+
+b) Make demo.local(added to the ingress.yaml) resolve to my machine: echo "127.0.0.1 demo.local" | sudo tee -a /etc/hosts
+
+c) Find traefik's listening port: kubectl get svc -n kube-system traefik
+
+d) Test:
+curl http://demo.local/
+curl http://demo.local/metrics
+ or
+curl http://demo.local:31865/
+
+STEP 14: DEMONSTRATE SELF HEALING
+Kubernetes checks if there is exactly one healthy running pod (replicas:1) 
+a) Confirm current health state: kubectl get pods
+b) Kill pod: kubectl delete pod 
+c) Immediately check pod status again: kubectl get pods
+A new pod appears automatically 
+***Self healing demonstration https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/SelfHealing.mp4
+ 
 ***OPTIONAL
-STEP 13: CREATE A CONFIG FILE
+STEP 15: CREATE A CONFIG FILE
+
 a) Edit app.py to read a configurable greeting message from an environment variable. The greeting message will be stored in the configMap.
 
 b) Rebuild and reimport the image since app.py changed.
