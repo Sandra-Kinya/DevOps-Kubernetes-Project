@@ -105,7 +105,7 @@ b) Kill pod: kubectl delete pod
 
 c) Immediately check pod status again: kubectl get pods
 A new pod appears automatically 
-***Self healing demonstration https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/SelfHealing.mp4
+***Self healing demonstration (https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/main/SelfHealing.mp4)
  
 ***OPTIONAL
 STEP 15: CREATE A CONFIG FILE
