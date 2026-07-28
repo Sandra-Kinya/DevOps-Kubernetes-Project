@@ -4,100 +4,105 @@ Deploy an app to a local K3s cluster, package with Helm, use Prometheus and Graf
 
 ![image alt](https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/265d1bc4ecda8967f86817fb035a05eb585a2414/Detailed_project_architecture.png)
 
-STEP 1a: INSTALL k3s
+**STEP 1a: INSTALL k3s**
 curl -sfL https://get.k3s.io | sh -
 
 VERIFY
 sudo k3s kubectl get nodes
 
-STEP 1b: INSTALL HELM
+**STEP 1b: INSTALL HELM**
 sudo snap install helm --classic
-***Helm is not available in default ubuntu package repositories
+*Helm is not available in default ubuntu package repositories*
 
-*** PERMISSION -To avoid sudo everytime
+**STEP 1c: Fix permission issue**
+*To avoid using sudo everytime*
 mkdir ~/.kube
 sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
 sudo chown $(id -u):$(id -g) ~/.kube/config
 
-STEP 2: CREATING A REPO - ***The project files will be in this directory
-Added .gitignore - ***to stop junk files from getting commited
+**STEP 2: CREATING A REPO** 
+The project files will be in this directory
+Added .gitignore - *To stop junk files and sensitive files from getting commited*
 
-STEP 3: CREATING THE FILE STRUCTURE
+**STEP 3: CREATING THE FILE STRUCTURE**
 
 ![image alt](https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/1d39f237c2bab2d6285c4c32d9f15c09aff7e988/FileStructure.png)
 
-STEP 4: CREATE THE APP
+**STEP 4: CREATE THE APP**
 cd app
 nano app.py
-*** I used port 8085 since port 8080 is currently being used by Jenkins - Use ss command to idenify ports.
+*I used port 8085 since port 8080 is currently being used by Jenkins. I used ss command to identify processes running on ports.*
 
-STEP 5: CREATE DOCKERFILE
+**STEP 5: CREATE DOCKERFILE**
 cd ..
 nano Dockerfile
-***COPY the correct directory app/app.py
-***EXPOSE 8085
+*COPY the correct directory app/app.py*
+*EXPOSE 8085*
 
-STEP 6: BUILD DOCKER IMAGE
+**STEP 6: BUILD DOCKER IMAGE**
 docker build -t demo-app:v.1.0 .
 
-STEP 7: IMPORT IMAGE INTO k3s
+**STEP 7: IMPORT IMAGE INTO k3s**
 docker save demo-app:v.1.0 | sudo k3s ctr images import -
 
-STEP 8: CREATE HELM CHART FILES
+**STEP 8: CREATE HELM CHART FILES**
 cd /charts/demo-app
 nano chart.yaml
 nano values.yaml
-*** I used port 8085
+*I used port 8085*
 
-STEP 9: CREATE TEMPLATE FILES
+**STEP 9: CREATE TEMPLATE FILES**
 cd template
-nano deployment.yaml
-***If no strategy is set, kubernetes uses rolling update by default
 
+**9a)**
+nano deployment.yaml
+*If no strategy is set, kubernetes uses rolling update by default*
+
+**9b)**
 nano service.yaml
 
-nano _helpers.tpl - I created helpers.tpl to store reusable template functions and naming rules. *** {{ include "demo-app.name" . }} are not built-in Helm functions they only work if a _helpers.tpl file defines them.
+**9c)**
+nano _helpers.tpl 
+I created helpers.tpl to store reusable template functions and naming rules. 
+*{{ include "demo-app.name" . }} are not built-in Helm functions they only work if a _helpers.tpl file defines them.*
+*I changed the hardcoded service name for the fullname helper — this is necessary so the Ingress actually points at the Service I deployed*
 
-***I changed the hardcoded service name for the fullname helper — this is necessary so the Ingress actually points at the Service I deployed
-
+**9d)**
 nano ingress.yaml - ***I added the kubernetes.io/ingress.class: traefik annotation
 
-STEP 10: DEPLOY THE APP WITH HELM
+**STEP 10: DEPLOY THE APP WITH HELM**
 cd ~/Sandra_tcs-devop-project-C
 helm install demo-app ./charts/demo-app
 
 
-STEP 11: VERIFY
+**STEP 11: VERIFY**
 kubectl get pods
 kubectl get svc
 
-STEP 12: Confirm the app actually responds
+**STEP 12: Confirm the app actually responds**
 kubectl port-forward svc/demo-app-demo-app 8085:8085
 
 curl http://localhost:8085/
 curl http://localhost:8085/metrics
 
-#CHECKING RESOURCE UTILIZATION
-I hecked cluster and pod resource usage using the metrics-server bundled with k3s:
+**CHECKING RESOURCE UTILIZATION**
+I checked cluster and pod resource usage using the metrics-server bundled with k3s:
 
-- `kubectl top node` — overall CPU/memory usage on the single-node cluster
-- `kubectl top pods -A` — per-pod usage across all namespaces
-- `kubectl top pod -n monitoring` — resource usage of the Prometheus/Grafana stack specifically
+- **kubectl top node** — overall CPU/memory usage on the single-node cluster
+- **kubectl top pods -A** — per-pod usage across all namespaces
+- **kubectl top pod -n monitoring** — resource usage of the Prometheus/Grafana stack specifically
 
-***Video attached
 
 https://github.com/user-attachments/assets/f7b348b6-0f9a-4c5e-b6cc-d3993f2e7d6b
 
 
-***I added CPU/memory requests and limits in deployment.yaml.These should be added to prevent one workload from starving others of resources.
-Demo-app now has explicit CPU/memory requests and limits set in values.yaml
-and applied via deployment.yaml, preventing it from starving other workloads
-(e.g. the monitoring stack) of cluster resources.
+**I added CPU and memory requests and limits in deployment.yaml**.These should be added to prevent one workload from starving others of resources.
+Demo-app now has explicit CPU and memory requests and limits set in values.yaml and applied via deployment.yaml, preventing it from starving other workloads (that is the monitoring stack) of cluster resources.
 
 <img width="923" height="211" alt="Resource_Limits" src="https://github.com/user-attachments/assets/ce247221-1d43-4b69-ad2f-59597c8b21c3" />
 
 
-#Dependencies
+**Checking Dependencies**
 - k3s: v1.36.2+k3s1
 - Helm: 
 - kubectl: 
@@ -107,39 +112,31 @@ and applied via deployment.yaml, preventing it from starving other workloads
 - Helm chart dependencies: none (standalone chart)
 - kube-prometheus-stack: installed via prometheus-community Helm repo
 
-***Video attached
-
-
 
 https://github.com/user-attachments/assets/80178c8c-a0fb-4e09-94e0-1bb4675b2807
 
 
 
-#Namespace overview
-***I created a separate namespace for monitoring. This is to provide isolation and clarity.
-
-***Video attached
+**Namespace overview**
+I created a separate namespace for monitoring. *This is to provide isolation and clarity.*
 
 
 https://github.com/user-attachments/assets/5d529b27-72b1-47d1-b1bd-ddc3f4aab015
 
 
-
-#Persistent storage awareness
+**Persistent storage awareness**
 kube-prometheus-stack did not create persistent volumes therefore I added persistent storage (PVCs) to Prometheus and Grafana via a Helm values override, so metrics history and dashboards survive pod restarts or rescheduling instead of being lost with the default ephemeral storage.
 
-***Video attached
 
 https://github.com/user-attachments/assets/9a4b338c-a008-4f96-97ef-359d0cb95f6e
 
 
+**secrets**
+Grafana admin password is auto-generated by the Helm chart and retrieved via:
+kubectl get secret monitoring-grafana -o jsonpath="{.data.admin-password}" | base64 --decode
 
-#secrets
-Grafana admin password is auto-generated by the Helm chart and retrieved via
-`kubectl get secret monitoring-grafana -o jsonpath="{.data.admin-password}" | base64 --decode`
 
-
-STEP 13: TESTING INGRESS
+**STEP 13: TESTING INGRESS**
 I used K3s default traefik.
 a) Confirm traefik is running: kubectl get pods -n kube-system | grep traefik 
 
@@ -153,8 +150,10 @@ curl http://demo.local/metrics
  or
 curl http://demo.local:31865/
 
+<img width="1836" height="301" alt="demo local" src="https://github.com/user-attachments/assets/d29fb0ba-d09d-4a3b-9f44-7d3816893ff8" />
 
-STEP 14: DEMONSTRATING SELF HEALING
+
+**STEP 14: DEMONSTRATING SELF HEALING**
 Kubernetes checks if there is exactly one healthy running pod (replicas:1) 
 
 a) Confirm current health state: kubectl get pods
@@ -163,9 +162,11 @@ b) Kill pod: kubectl delete pod
 
 c) Immediately check pod status again: kubectl get pods
 A new pod appears automatically 
-***Self healing demonstration (https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/main/SelfHealing.mp4)
 
-STEP 15: PRACTICE THE FULL HELM LIFECYCLE
+https://github.com/user-attachments/assets/d47d7a5f-a634-4505-8b06-a4de5fdcdf74
+
+
+**STEP 15: PRACTICE THE FULL HELM LIFECYCLE**
 a) Current state: 
 helm list
 kubectl get pods
@@ -196,9 +197,9 @@ kubectl get pods
 https://github.com/user-attachments/assets/f59b91a8-35d4-41c2-aead-1d1e312e0866
 
 
+**OPTIONAL**
 
-***OPTIONAL
-STEP 16: CREATE A CONFIG FILE
+**STEP 16: CREATE A CONFIG FILE**
 
 a) Edit app.py to read a configurable greeting message from an environment variable. The greeting message will be stored in the configMap.
 
@@ -214,7 +215,7 @@ d) Apply the changes
 cd ~/Sandra_tcs-devop-project-C
 helm upgrade demo-app ./charts/demo-app
 
-*** CHALLENGES ENCOUNTERED
+**CHALLENGES ENCOUNTERED**
 
 Port is already allocated
 Solution: I used port 8085 since port 8080 is currently being used by Jenkins.
@@ -244,10 +245,10 @@ Solution:
   git pull
   git push
 
-STEP 16: MONITORING
-***I created a separate namespace for monitoring - to enable isolation and avoid cluttering the defaults namespace where the app is.
+**STEP 16: MONITORING**
+*I created a separate namespace for monitoring* - to enable isolation and avoid cluttering the defaults namespace where the app is.
 
-a) b) Adding the helm repo:
+a) Adding the helm repo:
 helm repo add prometheus-community https://prometheus-community.>
 helm repo update
 helm repo list
@@ -303,7 +304,7 @@ localhost:3001
 
 c) Connections > Data source > Build a dashboard
 
-*** CHALLENGES ENCOUNTERED
+**CHALLENGES ENCOUNTERED**
 Grafana - Unable to listen on port 3000: Listeners failed to create with the following errors: [unable to create listener: Error listen tcp4 127.0.0.1:3000: bind: address already in use unable to create listener: Error listen tcp6 [::1]:3000: bind: address already in use]
 error: unable to listen on any of the requested ports: [{3000 3000}]
 Finding: sudo ss -tulpn | grep 3000 : Docker is running on that port
