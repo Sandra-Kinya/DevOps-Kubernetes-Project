@@ -4,7 +4,6 @@ Deploy an app to a local K3s cluster, package with Helm, use Prometheus and Graf
 
 ![image alt](https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/582b024384ad0d9d45476f515b74355c152ab5db/Detailed_project_architecture.png)
 
-
 STEP 1a: INSTALL k3s
 curl -sfL https://get.k3s.io | sh -
 
@@ -24,7 +23,7 @@ STEP 2: CREATING A REPO - ***The project files will be in this directory
 Added .gitignore - ***to stop junk files from getting commited
 
 STEP 3: CREATING THE FILE STRUCTURE
-mkdir -p app charts/demo-app/template
+![image alt](https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/f84d4629862abdf1bd79c394984798df65236db2/FolderStructure.md)
 
 STEP 4: CREATE THE APP
 cd app
