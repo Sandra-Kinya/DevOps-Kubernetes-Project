@@ -2,7 +2,7 @@
 
 Deploy an app to a local K3s cluster, package with Helm, use Prometheus and Grafana for monitoring.
 
-Architecture diagram
+![image alt](https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/582b024384ad0d9d45476f515b74355c152ab5db/Detailed_project_architecture.png)
 
 
 STEP 1a: INSTALL k3s
