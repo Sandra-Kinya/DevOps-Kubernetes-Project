@@ -24,7 +24,7 @@ Added .gitignore - ***to stop junk files from getting commited
 
 STEP 3: CREATING THE FILE STRUCTURE
 
-![image alt](https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/d47fd9b37733d090fb2b0dd4fa1ae3c7ec003a76/FileStructure.png)
+![image alt](https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/1d39f237c2bab2d6285c4c32d9f15c09aff7e988/FileStructure.png)
 
 STEP 4: CREATE THE APP
 cd app
@@ -66,14 +66,6 @@ STEP 10: DEPLOY THE APP WITH HELM
 cd ~/Sandra_tcs-devop-project-C
 helm install demo-app ./charts/demo-app
 
-NAME: demo-app
-LAST DEPLOYED: Wed Jul 22 13:25:49 2026
-NAMESPACE: default
-STATUS: deployed
-REVISION: 1
-DESCRIPTION: Install complete
-TEST SUITE: None
-
 
 STEP 11: VERIFY
 kubectl get pods
@@ -92,12 +84,18 @@ I hecked cluster and pod resource usage using the metrics-server bundled with k3
 - `kubectl top pods -A` — per-pod usage across all namespaces
 - `kubectl top pod -n monitoring` — resource usage of the Prometheus/Grafana stack specifically
 
-***Find video attached (https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/main/ResourceUtilization.mp4)
+***Video attached
+
+https://github.com/user-attachments/assets/f7b348b6-0f9a-4c5e-b6cc-d3993f2e7d6b
+
 
 ***I added CPU/memory requests and limits in deployment.yaml.These should be added to prevent one workload from starving others of resources.
 Demo-app now has explicit CPU/memory requests and limits set in values.yaml
 and applied via deployment.yaml, preventing it from starving other workloads
 (e.g. the monitoring stack) of cluster resources.
+
+<img width="923" height="211" alt="Resource_Limits" src="https://github.com/user-attachments/assets/ce247221-1d43-4b69-ad2f-59597c8b21c3" />
+
 
 #Dependencies
 - k3s: v1.36.2+k3s1
@@ -109,13 +107,31 @@ and applied via deployment.yaml, preventing it from starving other workloads
 - Helm chart dependencies: none (standalone chart)
 - kube-prometheus-stack: installed via prometheus-community Helm repo
 
+***Video attached
+
+
+
+https://github.com/user-attachments/assets/80178c8c-a0fb-4e09-94e0-1bb4675b2807
+
+
 
 #Namespace overview
 ***I created a separate namespace for monitoring. This is to provide isolation and clarity.
 
+***Video attached
+
+
+https://github.com/user-attachments/assets/5d529b27-72b1-47d1-b1bd-ddc3f4aab015
+
+
 
 #Persistent storage awareness
 kube-prometheus-stack did not create persistent volumes therefore I added persistent storage (PVCs) to Prometheus and Grafana via a Helm values override, so metrics history and dashboards survive pod restarts or rescheduling instead of being lost with the default ephemeral storage.
+
+***Video attached
+
+https://github.com/user-attachments/assets/9a4b338c-a008-4f96-97ef-359d0cb95f6e
+
 
 
 #secrets
@@ -174,7 +190,10 @@ kubectl get svc
 g) Reinstall
 helm install demo-app
 kubectl get pods
-***Helm lifecycle demonstration (https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C>
+***Video attached
+
+
+https://github.com/user-attachments/assets/f59b91a8-35d4-41c2-aead-1d1e312e0866
 
 
 
@@ -239,14 +258,6 @@ kubectl get namespaces
 
 c) Install prometheus into the namespace:
 helm install monitoring prometheus-community/kube-prometheus-stack -n monitoring
-Result: 
-NAME: monitoring
-LAST DEPLOYED: Mon Jul 27 15:13:42 2026
-NAMESPACE: monitoring
-STATUS: deployed
-REVISION: 1
-DESCRIPTION: Install complete
-TEST SUITE: None
 
 d) Verify several pods were created and running
 kubectl get pods -n monitoring
@@ -262,18 +273,6 @@ http://localhost:3001
 STEP 17: GET PROMETHEUS TO SCRAP YOUR APP.
 a) Check the label selector that prometheus expects: 
 kubectl get prometheus -n monitoring -o yaml | grep -A10 serviceMonitorSelector
-Result:
-serviceMonitorSelector:
-      matchLabels:
-        release: monitoring
-    shards: 1
-    tsdb:
-      outOfOrderTimeWindow: 0s
-    version: v3.13.1-distroless
-    walCompression: true
-  status:
-    availableReplicas: 1
-    conditions:
 
 b) Create ServiceMonitor yaml
 
