@@ -2,7 +2,7 @@
 
 Deploy an app to a local K3s cluster, package with Helm, use Prometheus and Grafana for monitoring.
 
-![image alt](https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/582b024384ad0d9d45476f515b74355c152ab5db/Detailed_project_architecture.png)
+![image alt](https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/265d1bc4ecda8967f86817fb035a05eb585a2414/Detailed_project_architecture.png)
 
 STEP 1a: INSTALL k3s
 curl -sfL https://get.k3s.io | sh -
@@ -23,7 +23,8 @@ STEP 2: CREATING A REPO - ***The project files will be in this directory
 Added .gitignore - ***to stop junk files from getting commited
 
 STEP 3: CREATING THE FILE STRUCTURE
-![image alt](https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/f84d4629862abdf1bd79c394984798df65236db2/FileStructure.png)
+
+![image alt](https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/d47fd9b37733d090fb2b0dd4fa1ae3c7ec003a76/FileStructure.png)
 
 STEP 4: CREATE THE APP
 cd app
