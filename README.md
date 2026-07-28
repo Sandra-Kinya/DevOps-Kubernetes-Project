@@ -23,7 +23,7 @@ STEP 2: CREATING A REPO - ***The project files will be in this directory
 Added .gitignore - ***to stop junk files from getting commited
 
 STEP 3: CREATING THE FILE STRUCTURE
-![image alt](https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/f84d4629862abdf1bd79c394984798df65236db2/FolderStructure.md)
+![image alt](https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/f84d4629862abdf1bd79c394984798df65236db2/FileStructure.png)
 
 STEP 4: CREATE THE APP
 cd app
@@ -64,7 +64,6 @@ nano ingress.yaml - ***I added the kubernetes.io/ingress.class: traefik annotati
 STEP 10: DEPLOY THE APP WITH HELM
 cd ~/Sandra_tcs-devop-project-C
 helm install demo-app ./charts/demo-app
-*** Incase of changes run - helm upgrade demo-app ./charts/demo-app
 
 NAME: demo-app
 LAST DEPLOYED: Wed Jul 22 13:25:49 2026
