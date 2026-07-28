@@ -11,3 +11,11 @@ service:
 
 config:
   appGreeting: "Hello from Kubernetes + Helm!"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

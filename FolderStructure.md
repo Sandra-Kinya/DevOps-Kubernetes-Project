@@ -9,11 +9,13 @@ Sandra_tcs-devop-project-C/
 │           ├── deployment.yaml
 │           ├── service.yaml
 │           ├── configmap.yaml
-│	    ├── configmap.yaml
+│           ├── servicemonitor.yaml
+│           ├── ingress.yaml
 │           └── _helpers.tpl
 ├── Dockerfile
 ├── .gitignore
+├── README.md
+├── Implementation_videos/
 ├── Detailed_project_architecture.png
 ├── K3s_project_architecture.png
-├── README.md
 └── FolderStructure.md

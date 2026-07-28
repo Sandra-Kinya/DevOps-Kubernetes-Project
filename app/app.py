@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, Response
 import  os
 
 app = Flask(__name__)
@@ -11,7 +11,7 @@ def hello():
 
 @app.route('/metrics')
 def metrics():
-    return "demo_app_custom_metric 1\n"
+    return Response("demo_app_custom_metric 1\n", mimetype="text/plain")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8085)
