@@ -23,7 +23,7 @@ STEP 2: CREATING A REPO - ***The project files will be in this directory
 Added .gitignore - ***to stop junk files from getting commited
 
 STEP 3: CREATING THE FILE STRUCTURE
-![image alt](https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/f84d4629862abdf1bd79c394984798df65236db2/FileStructure.png)
+![image alt](https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/d47fd9b37733d090fb2b0dd4fa1ae3c7ec003a76/FileStructure.png)
 
 STEP 4: CREATE THE APP
 cd app
