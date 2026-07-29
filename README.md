@@ -31,7 +31,11 @@ Added .gitignore - *To stop junk files and sensitive files from getting commited
 **STEP 4: CREATE THE APP**
 cd app
 nano app.py
-*I used port 8085 since port 8080 is currently being used by Jenkins. I used ss command to identify processes running on ports.*
+*I used port 8085*
+
+***/ route** — returns a greeting message. That message is read from an environment variable (APP_GREETING), with a hardcoded fallback if that variable isn't set — this is what the ConfigMap later feeds in*
+
+***/metrics route** — exposes one custom metric in the exact text format Prometheus expects, with the correct Content-Type header (text/plain) — this was a fix for a scrape error in prometheus.*
 
 **STEP 5: CREATE DOCKERFILE**
 cd ..
@@ -47,28 +51,33 @@ docker save demo-app:v.1.0 | sudo k3s ctr images import -
 
 **STEP 8: CREATE HELM CHART FILES**
 cd /charts/demo-app
-nano chart.yaml
-nano values.yaml
+**8a) nano chart.yaml** - *Declares helm's name, version, and a short description.*
+
+**8b) nano values.yaml**
 *I used port 8085*
+*Contains every configurable value templates use (image tag, replica count, port, greeting text, CPU/memory limits)*
 
 **STEP 9: CREATE TEMPLATE FILES**
 cd template
 
-**9a)**
-nano deployment.yaml
+**9a) nano deployment.yaml**
 *If no strategy is set, kubernetes uses rolling update by default*
+*Tells Kubernetes to keep exactly 1 replicaCount copies of this Pod running, using this image, with these resource limits, loading this **ConfigMap** as environment variables.*
 
-**9b)**
-nano service.yaml
+**9b) nano service.yaml**
+*Creates a stable internal network address (demo-app-demo-app, port 8085) that routes traffic to the pod that is currently running*
 
-**9c)**
-nano _helpers.tpl 
-I created helpers.tpl to store reusable template functions and naming rules. 
-*{{ include "demo-app.name" . }} are not built-in Helm functions they only work if a _helpers.tpl file defines them.*
+**9c) nano _helpers.tpl**
+*I created helpers.tpl to store reusable template functions and naming rules - {{ include "demo-app.name" . }} are not built-in Helm functions they only work if a _helpers.tpl file defines them.*
 *I changed the hardcoded service name for the fullname helper — this is necessary so the Ingress actually points at the Service I deployed*
 
-**9d)**
-nano ingress.yaml - ***I added the kubernetes.io/ingress.class: traefik annotation
+**9d) nano configmap.yaml** - stores the configurable greeting message (APP_GREETING) as a Kubernetes ConfigMap, which the Deployment loads into the container as an environment variable — *This will allow me to change the greeting without rebuilding the image.*
+
+**9e) nano ingress.yaml** - *I added the kubernetes.io/ingress.class: traefik annotation* This routes external requests arriving at demo.local to the demo-app-demo-app Service making the app reachable via a normal URL instead of only kubectl port-forward.
+
+**9e) nano servicemonitor.yaml** - tells the Prometheus Operator to find any Service labeled app: demo-app, and scrape its /metrics endpoint every 15 seconds.
+
+**9e) nano monitor-calues.yaml** - Helm values override - to the separate kube-prometheus-stack chart that enables persistent storage for Prometheus and Grafana so their data survives pod restarts.
 
 **STEP 10: DEPLOY THE APP WITH HELM**
 cd ~/Sandra_tcs-devop-project-C
@@ -244,6 +253,7 @@ Solution:
   git config pull.rebase false
   git pull
   git push
+**PENDING**
 
 **STEP 16: MONITORING**
 *I created a separate namespace for monitoring* - to enable isolation and avoid cluttering the defaults namespace where the app is.
@@ -271,7 +281,7 @@ f) To access Grafana
 kubectl port-forward svc/monitoring-grafana -n monitoring 3001:80
 http://localhost:3001
 
-STEP 17: GET PROMETHEUS TO SCRAP YOUR APP.
+**STEP 17: GET PROMETHEUS TO SCRAP YOUR APP.**
 a) Check the label selector that prometheus expects: 
 kubectl get prometheus -n monitoring -o yaml | grep -A10 serviceMonitorSelector
 
@@ -294,7 +304,7 @@ kubectl port-forward svc/monitoring-kube-prometheus-prometheus -n monitoring 909
 http://localhost:9091/targets
 
 
-STEP 18: BUILDING GRAFANA DASHBOARD
+**STEP 18: BUILDING GRAFANA DASHBOARD**
 a) Confirm prometheus has the metric on UI
 Query:
 demo_app_custom_metric
