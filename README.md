@@ -224,37 +224,6 @@ d) Apply the changes
 cd ~/Sandra_tcs-devop-project-C
 helm upgrade demo-app ./charts/demo-app
 
-**CHALLENGES ENCOUNTERED**
-
-Port is already allocated
-Solution: I used port 8085 since port 8080 is currently being used by Jenkins.
-
-Error calling include
-Solution: I created _helpers.tpl to store reusable template functions and naming rules.
-
-Helm reported "Install complete" but no pods or services were created
-Finding: The templates folder was misspelled "template" instead of "templates".
-Solution: mv template templates, then re-ran helm upgrade.
-
-ErrImageNeverPull - pod stuck, image not found
-Finding: values.yaml requested image tag "latest", but only "v1.0" existed in
-k3s's containerd store.
-Solution: Updating values.yaml to reference the tag that actually existed.
-
-Tag mismatch between Docker and containerd (v1.0 vs v.1.0)
-Finding: Docker's local image store had the image tagged "v.1.0" (with a dot),
-while containerd's k8s.io namespace had it imported as "v1.0" (no dot) 
-Solution: Standardized on "v.1.0" across values.yaml, the Docker build
-command, and the containerd import command.
-
-git push rejected - divergent branches
-Finding: I edited the readme file using GUI, commited the changes and forgot to pull the repo when working on the project. Thus the remote repo had commits not present locally. 
-Solution:
-  git config pull.rebase false
-  git pull
-  git push
-**PENDING**
-
 **STEP 16: MONITORING**
 *I created a separate namespace for monitoring* - to enable isolation and avoid cluttering the defaults namespace where the app is.
 
@@ -314,7 +283,77 @@ localhost:3001
 
 c) Connections > Data source > Build a dashboard
 
+
+**STEP 19: PUSH IMAGE TO DOCKER HUB**
+
+The app image is pushed to Docker Hub (public registry) instead of being
+imported directly into k3s's local containerd store.
+
+*CI/CD pattern: build → push to cloud registry → cluster pulls the image
+over the network, rather than relying on local-only images.*
+
+a)Login to docker hub via terminal
+docker login
+
+b) Create a repository on Docker Hub
+
+c) Tag existing image with docker hub username
+docker tag demo-app:v.1.0 sandrakinya/demo-app:v.1.0
+
+d) Push image to docker hub
+docker push sandrakinya/demo-app:v.1.0
+
+e) Update values.yaml to pull from docker hub instead of local import
+image:
+  repository: sandrakinya/demo-app
+  tag: v.1.0
+  pullPolicy: IfNotPresent
+*IfNotPresent means pull from the registry (Docker Hub) if it's not already cached locally.*
+
+f) Apply change
+helm upgrade demo-app ./charts/demo-app
+
+g) Delete previous pod - to use a fresh pod which pulls from Docker Hub
+
+h) Verify
+kubectl get pods
+kubectl describe pod 
+
+kubectl get svc -n default*Any changes on app.py hence forth will require: docker build - docker push - kubectl delete pod.*
+
+
 **CHALLENGES ENCOUNTERED**
+
+
+Port is already allocated
+Solution: I used port 8085 since port 8080 is currently being used by Jenkins.
+
+Error calling include
+Solution: I created _helpers.tpl to store reusable template functions and naming rules.
+
+Helm reported "Install complete" but no pods or services were created
+Finding: The templates folder was misspelled "template" instead of "templates".
+Solution: mv template templates, then re-ran helm upgrade.
+
+ErrImageNeverPull - pod stuck, image not found
+Finding: values.yaml requested image tag "latest", but only "v1.0" existed in
+k3s's containerd store.
+Solution: Updating values.yaml to reference the tag that actually existed.
+
+Tag mismatch between Docker and containerd (v1.0 vs v.1.0)
+Finding: Docker's local image store had the image tagged "v.1.0" (with a dot),
+while containerd's k8s.io namespace had it imported as "v1.0" (no dot)
+Solution: Standardized on "v.1.0" across values.yaml, the Docker build
+command, and the containerd import command.
+
+git push rejected - divergent branches
+Finding: I edited the readme file using GUI, commited the changes and forgot to pull the repo when working on the project. Thus the remote repo had commits not present locally.
+Solution:
+  git config pull.rebase false
+  git pull
+  git push
+
+
 Grafana - Unable to listen on port 3000: Listeners failed to create with the following errors: [unable to create listener: Error listen tcp4 127.0.0.1:3000: bind: address already in use unable to create listener: Error listen tcp6 [::1]:3000: bind: address already in use]
 error: unable to listen on any of the requested ports: [{3000 3000}]
 Finding: sudo ss -tulpn | grep 3000 : Docker is running on that port
@@ -324,3 +363,8 @@ Prometheus -
 Unable to listen on port 9090: Listeners failed to create with the following errors: [unable to create listener: Error listen tcp4 127.0.0.1:9090: bind: address already in use unable to create listener: Error listen tcp6 [::1]:9090: bind: address already in use]
 error: unable to listen on any of the requested ports: [{9090 9090}]
 Solution: kubectl port-forward svc/monitoring-kube-prometheus-prometheus -n monitoring 9091:9090
+
+failed to resolve reference "SandraKinya/demo-app:v.1.0": failed to do request: 
+Head https://SandraKinya/v2/demo-app/manifests/v.1.0": dial tcp: lookup SandraKinya
+Finding: Docker image references must be entirely lowercase — capital letters aren't valid in image names/tags.
+Solution: Re-tag and push image with lowercase name
