@@ -1,9 +1,9 @@
 replicaCount: 1
 
 image:
-  repository: demo-app
+  repository: sandrakinya/demo-app
   tag: v.1.0
-  pullPolicy: Never
+  pullPolicy: IfNotPresent
 
 service:
   type: ClusterIP
