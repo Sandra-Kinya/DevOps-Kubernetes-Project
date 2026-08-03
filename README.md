@@ -3,13 +3,32 @@
 ## Deploying an app to a local K3s cluster --> package with Helm --> use Prometheus and Grafana for monitoring.
 This project demonstrates how to deploy a Flask application to a K3s cluster using Helm and implement monitoring.
 
+## Table of Contents
+
+- Project Overview
+- Project architecture
+- Installation
+- Deployment
+- Monitoring
+- Optional tasks
+- Tests
+- Challenges
+
+## Project overview
+[x] Deploying a Flask application on K3s using Helm
+[x] Using ConfigMaps for application configuration
+[x] Exposing custom Prometheus metrics
+[x] Monitoring the application with Prometheus and Grafana
+[x] Setting up Prometheus alert rules
+[x] Demonstrating Kubernetes self healing and scaling
+[x] Pushing docker image to dockerhub
 
 ## Project architecture
 https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/1574b7d575fda566c5813f61ba2887b3a334388d/Detailed_project_architecture.png
 
 ---
 
-### 1. Installation 
+## 1. Installation 
 **1a: INSTALL k3s**
 ```bash
 curl -sfL https://get.k3s.io | sh -
@@ -46,19 +65,21 @@ https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/1574b7d575fda
 ### 4: MODIFYING THE APP FILE
 ```python
 from flask import Flask, Response
-import  os
+import os
 
 app = Flask(__name__)
-
 GREETING = os.environ.get("APP_GREETING", "Hello from Kubernetes + Helm!")
+request_count = 0
 
 @app.route('/')
 def hello():
+    global request_count
+    request_count += 1
     return GREETING
 
 @app.route('/metrics')
 def metrics():
-    return Response("demo_app_custom_metric 1\n", mimetype="text/plain")
+    return Response(f"demo_app_custom_metric {request_count}\n", mimetype="text/plain")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8085)
@@ -68,6 +89,8 @@ if __name__ == '__main__':
 **/ route** — returns a greeting message. That message is read from an environment variable (APP_GREETING), with a hardcoded fallback if that variable isn't set — this is what the ConfigMap later feeds in*
 
 **/metrics route** — exposes one custom metric in the exact text format Prometheus expects, with the correct Content-Type header (text/plain) — this was a fix for a scrape error in prometheus.*
+
+**count requests** - makes the metric dynamic. Every hit to / increments the metricevery hit to / increments the metric.
 
 ### 5: DOCKERFILE
 ```dockerfile
@@ -83,6 +106,8 @@ CMD ["python", "app.py"]
 ```bash
 docker build -t demo-app:v.1.0 .
 ```
+
+## Deployment
 
 ### 7: IMPORT IMAGE INTO k3s
 ```bash
@@ -222,7 +247,7 @@ data:
 
 **9e) nano ingress.yaml** - *I added the kubernetes.io/ingress.class: traefik annotation* 
 This routes external requests arriving at demo.local to the demo-app-demo-app Service making the app reachable via a normal URL instead of only kubectl port-forward.
-Added ip address to etc/hosts to map to demo.local
+Added ip address to hosts to map to demo.local
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -239,6 +264,42 @@ spec:
         pathType: Prefix
         backend:
           service:
+envFrom:
+        - configMapRef:
+            name: {{ include "demo-app.fullname" . }}-config
+
+        resources:
+          requests:
+            cpu: {{ .Values.resources.requests.cpu }}
+            memory: {{ .Values.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.resources.limits.cpu }}
+            memory: {{ .Values.resources.limits.memory }}
+```
+
+**9b) nano service.yaml**
+*Creates a stable internal network address (demo-app-demo-app, port 8085) that routes tra>
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "demo-app.fullname" . }}
+  labels:
+    app: {{ include "demo-app.name" . }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: {{ include "demo-app.name" . }}
+  ports:
+  - name: http
+    port: {{ .Values.service.port }}
+    targetPort: 8085
+```
+
+**9c) nano _helpers.tpl**
+*I created helpers.tpl to store reusable template functions and naming rules - {{ include>
+*I changed the hardcoded service name for the fullname helper — this is necessary so the >
+```yaml
             name: {{ include "demo-app.fullname" . }}
             port:
               number: {{ .Values.service.port }}
@@ -297,6 +358,7 @@ curl http://demo.local/metrics
 
 https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/1574b7d575fda566c5813f61ba2887b3a334388d/Implementation_videos/demo.local.png
 
+## Monitoring
 
 ### 14: Implementing monitoring
 *I created a separate namespace for monitoring* - to enable isolation and avoid cluttering the defaults namespace where the app is.
@@ -318,15 +380,12 @@ kubectl get namespaces
 ```bash
 helm install monitoring prometheus-community/kube-prometheus-stack -n monitoring
 ```
+
 **14d) Verify several pods were created and running**
 ```bash
 kubectl get pods -n monitoring
 ```
-**14e) Get admin password**
-```bash
-kubectl get secret -n monitoring monitoring-grafana -o jsonpath="{.data.admin-password}" | base64 --decode
-echo
-```
+
 **14f) To access Grafana**
 ```bash
 kubectl port-forward svc/monitoring-grafana -n monitoring 3001:80
@@ -334,13 +393,58 @@ kubectl port-forward svc/monitoring-grafana -n monitoring 3001:80
 http://localhost:3001
 
 
-### 15: Getting prometheus to scrap the application.
+### 15: Creating rule file for alerting
 
-**15a) Check the label selector that prometheus expects:**
+**15a)**
+> This rule fires if Prometheus can't scrape the app for 1 minute straight.
+
+```bash
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "demo-app.fullname" . }}-rules
+  labels:
+    release: monitoring
+spec:
+  groups:
+  - name: demo-app.rules
+    rules:
+    - alert: DemoAppPodDown
+      expr: up{job="demo-app-demo-app"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Demo app pod is down"
+        description: "The demo-app target has been unreachable for more than 1 minute."
+```
+
+**15b) Apply the change**
+
+```bash
+cd ~/Sandra_tcs-devop-project-C
+helm upgrade demo-app ./charts/demo-app
+```
+
+**15c) Confirm Prometheus loaded the rule**
+```bash
+kubectl get prometheusrule -n default
+```
+
+**15d) Test**
+Delete pod and check if the alert fires
+```bash
+kubectl delete pod -l app=demo-app -n default
+```
+
+### 16: Getting prometheus to scrap the application.
+
+**16a) Check the label selector that prometheus expects:**
 ```bash
 kubectl get prometheus -n monitoring -o yaml | grep -A10 serviceMonitorSelector
 ```
-**15b) Create ServiceMonitor yaml**
+
+**16b) Create ServiceMonitor yaml**
 
 > Tells the Prometheus Operator to find any Service labeled app: demo-app, and scrape its /metrics endpoint every 15 seconds.>
 
@@ -362,39 +466,44 @@ spec:
 ```
 
 
-**15c) Added a name port in service.yaml**
+**16c) Added a name port in service.yaml**
 ***To expose multiple ports, every port has to have a unique name. These names are used to map he service ports.
 
-**15d) Apply changes**
+**16d) Apply changes**
 ```bash
 helm upgrade
 ```
 
-**15e) Verify prometheus picked it up**
+**16e) Verify prometheus picked it up**
 ```bash
 kubectl get servicemonitor -A
 ```
 
-**15f) Get the service name**
+**16f) Get the service name**
 ```bash
 kubectl get svc -n monitoring
 ```
 
-**15g) Port forward**
+**16g) Port forward**
 ```bash
 kubectl port-forward svc/monitoring-kube-prometheus-prometheus -n monitoring 9091:9090
 http://localhost:9091/targets
 ```
+> This keeps running continuously in the background for the connection to stay alive.
 
-**STEP 16: BUILDING GRAFANA DASHBOARD**
-a) Confirm prometheus has the metric on UI
+**16h) Making the metric more dynamic**
+> Add count request to app.py
+**count requests** - makes the metric dynamic. Every hit to / increments the metric
+
+### 17: BUILDING GRAFANA DASHBOARD**
+**17a) Confirm prometheus has the metric on UI**
 Query:
 demo_app_custom_metric
 
-b) Open Grafana on the browser
+**17b) Open Grafana on the browser**
 localhost:3001
 
-c) Connections > Data source > Build a dashboard
+**17c) Connections > Data source > Build a dashboard**
 
 
 ---
@@ -493,9 +602,9 @@ trivy image --format cyclonedx -o reports/docker-sbom.json sandrakinya/demo-app:
 
 <details>
 <summary> ## TESTS </summary>
-
+## Tests
 ### 1. DEMONSTRATING SELF HEALING
-Kubernetes checks if there is exactly one healthy running pod (replicas:1)
+Kubernetes checks if there is exactly one healthy running pod (replicas:2)
 
 a) Confirm current health state: kubectl get pods
 
@@ -606,13 +715,30 @@ kube-prometheus-stack did not create persistent volumes therefore I added persis
 
 https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/1574b7d575fda566c5813f61ba2887b3a334388d/Implementation_videos/PersistentStorage.mp4
 
-**secrets**
-Grafana admin password is auto-generated by the Helm chart and retrieved via:
-kubectl get secret monitoring-grafana -o jsonpath="{.data.admin-password}" | base64 --decode
+
+### Test scaling
+**a) Scale up manually**
+```bash
+kubectl scale deployment demo-app-demo-app -n default --replicas=3
+kubectl get pods -n default
+```
+
+**b) Confirm the Service load-balances across all 3**
+```bash
+kubectl port-forward svc/demo-app-demo-app 8085:8085
+```
+curl http://localhost:8085/ calls — traffic is distributed across the 3 pods.
+
+**c) Scale back down**
+```bash
+kubectl scale deployment demo-app-demo-app -n default --replicas=1
+```
+
 </details>
 
 
 ---
+
 <details>
 <summary> ## CHALLENGES ENCOUNTERED</summary>
 ### ISSUES
