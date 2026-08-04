@@ -15,13 +15,13 @@ This project demonstrates how to deploy a Flask application to a K3s cluster usi
 - Challenges
 
 ## Project overview
-[x] Deploying a Flask application on K3s using Helm
-[x] Using ConfigMaps for application configuration
-[x] Exposing custom Prometheus metrics
-[x] Monitoring the application with Prometheus and Grafana
-[x] Setting up Prometheus alert rules
-[x] Demonstrating Kubernetes self healing and scaling
-[x] Pushing docker image to dockerhub
+- Deploying a Flask application on K3s using Helm
+- Using ConfigMaps for application configuration
+- Exposing custom Prometheus metrics
+- Monitoring the application with Prometheus and Grafana
+- Setting up Prometheus alert rules
+- Demonstrating Kubernetes self healing and scaling
+- Pushing docker image to dockerhub
 
 ## Project architecture
 https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/1574b7d575fda566c5813f61ba2887b3a334388d/Detailed_project_architecture.png
@@ -386,11 +386,19 @@ helm install monitoring prometheus-community/kube-prometheus-stack -n monitoring
 kubectl get pods -n monitoring
 ```
 
-**14f) To access Grafana**
+**14f) To access prometheus**
+```bash
+kubectl port-forward svc/monitoring-kube-prometheus-prometheus -n monitoring 9091:9090
+```
+http://localhost:9091
+
+**14g) To access Grafana**
 ```bash
 kubectl port-forward svc/monitoring-grafana -n monitoring 3001:80
 ```
-http://localhost:3001
+http://localhost:3001:80
+
+> This keeps running continuously in the background for the connection to stay alive.
 
 
 ### 15: Creating rule file for alerting
@@ -484,17 +492,20 @@ kubectl get servicemonitor -A
 kubectl get svc -n monitoring
 ```
 
-**16g) Port forward**
-```bash
-kubectl port-forward svc/monitoring-kube-prometheus-prometheus -n monitoring 9091:9090
-http://localhost:9091/targets
-```
-> This keeps running continuously in the background for the connection to stay alive.
-
-**16h) Making the metric more dynamic**
+**16g) Making the metric more dynamic**
 > Add count request to app.py
 **count requests** - makes the metric dynamic. Every hit to / increments the metric
 
+**16h) Triggering the prometheus alert**
+```bash
+kubectl scale deployment demo-app-demo-app -n default --replicas=0
+```
+
+**Restore normal state**
+
+```bash
+kubectl scale deployment demo-app-demo-app -n default --replicas=1
+```
 ### 17: BUILDING GRAFANA DASHBOARD**
 **17a) Confirm prometheus has the metric on UI**
 Query:
@@ -503,8 +514,19 @@ demo_app_custom_metric
 **17b) Open Grafana on the browser**
 localhost:3001
 
-**17c) Connections > Data source > Build a dashboard**
+**17c) Create a new dashboard**
+Dashboards > New > Add visualization
 
+**17d) Grafana Dashboard Panels**
+
+| Panel Title | PromQL Query |
+|--------------|--------------|
+| Demo App Custom Metric | `demo_app_custom_metric` |
+| Request Rate (per second) | `rate(demo_app_custom_metric[1m])` |
+| Pod CPU Usage | `sum(rate(container_cpu_usage_seconds_total{namespace="default"}[5m]))` |
+| Pod Memory Usage | `sum(container_memory_working_set_bytes{namespace="default"})` |
+| Pod Restarts | `kube_pod_container_status_restarts_total{namespace="default"}` |
+| Running Pods | `count(kube_pod_status_phase{namespace="default", phase="Running"})` |
 
 ---
 
@@ -512,7 +534,6 @@ localhost:3001
 ### PUSH IMAGE TO DOCKER HUB
 
 ** Build image --> Push to docker hub --> Pull into K3s**
-
 
 
 The app image is pushed to Docker Hub instead of being
