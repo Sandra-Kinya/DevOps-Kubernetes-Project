@@ -24,7 +24,7 @@ This project demonstrates how to deploy a Flask application to a K3s cluster usi
 - Pushing docker image to dockerhub
 
 ## Project architecture
-https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/1574b7d575fda566c5813f61ba2887b3a334388d/Detailed_project_architecture.png
+<img width="1440" height="1600" alt="Detailed_project_architecture" src="https://github.com/user-attachments/assets/1cc81b20-ed51-444e-987f-2266f95af6d2" />
 
 ---
 
@@ -60,7 +60,8 @@ Added .gitignore
 
 ### 3. CREATING THE FILE STRUCTURE
 
-https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/1574b7d575fda566c5813f61ba2887b3a334388d/FileStructure.png
+<img width="436" height="618" alt="FileStructure" src="https://github.com/user-attachments/assets/838ed19c-769c-4041-9136-60242ebd73bc" />
+
 
 ### 4: MODIFYING THE APP FILE
 ```python
@@ -397,6 +398,9 @@ curl http://localhost:8085/
 curl http://localhost:8085/metrics
 ```
 
+<img width="1836" height="301" alt="demo local" src="https://github.com/user-attachments/assets/91fa6b23-9337-4360-bbac-123df069bd26" />
+
+
 ### 13: Confirm the app responds via ingress
 
 a) Confirm ingress is running: kubectl get ingress
@@ -407,7 +411,8 @@ c) Test:
 curl http://demo.local/
 curl http://demo.local/metrics
 
-https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/1574b7d575fda566c5813f61ba2887b3a334388d/Implementation_videos/demo.local.png
+https://github.com/user-attachments/assets/f239abe3-2f23-48f7-968f-65f38d3f3e58
+
 
 ## Monitoring
 
@@ -442,6 +447,7 @@ kubectl get pods -n monitoring
 kubectl port-forward svc/monitoring-kube-prometheus-prometheus -n monitoring 9091:9090
 ```
 http://localhost:9091
+
 
 **14g) To access Grafana**
 ```bash
@@ -495,6 +501,8 @@ Delete pod and check if the alert fires
 ```bash
 kubectl delete pod -l app=demo-app -n default
 ```
+<img width="1833" height="702" alt="Prometheus_alerts" src="https://github.com/user-attachments/assets/d74e9ea1-7221-47b7-bf74-35bbb2374938" />
+
 
 ### 16: Getting prometheus to scrap the application.
 
@@ -553,10 +561,11 @@ kubectl scale deployment demo-app-demo-app -n default --replicas=0
 ```
 
 **Restore normal state**
-
 ```bash
 kubectl scale deployment demo-app-demo-app -n default --replicas=1
 ```
+
+<img width="1833" height="940" alt="Prometheus_ScrapedData" src="https://github.com/user-attachments/assets/cc39bbf1-dba2-47c1-867d-ea3db662e295" />
 
 
 ### 17: BUILDING GRAFANA DASHBOARD**
@@ -580,6 +589,15 @@ Dashboards > New > Add visualization
 | Pod Memory Usage | `sum(container_memory_working_set_bytes{namespace="default"})` |
 | Pod Restarts | `kube_pod_container_status_restarts_total{namespace="default"}` |
 | Running Pods | `count(kube_pod_status_phase{namespace="default", phase="Running"})` |
+
+
+<img width="1833" height="940" alt="Grafana dashboard" src="https://github.com/user-attachments/assets/7b504d89-90d9-41ca-bf00-8ca9f2c9c5c4" />
+
+
+**Simulating self healing, scaling and errors**
+
+> Ran these commands and observe the changes on the dashboard in grafana
+> Find video attached.
 
 
 ---
@@ -636,6 +654,8 @@ kubectl get svc -n default
 ```
 
 > Any changes on app.py hence forth will require: docker build - docker push - kubectl delete pod.
+
+<img width="1838" height="817" alt="Docker_hub_repository" src="https://github.com/user-attachments/assets/74c2775c-c61d-414b-8312-1b7e609b9622" />
 
 
 
@@ -794,6 +814,7 @@ trivy image --format cyclonedx -o reports/docker-sbom.json sandrakinya/demo-app:
 
 <details>
 <summary> TESTS </summary>
+
 ## TESTS
 ### 1. DEMONSTRATING SELF HEALING
 Kubernetes checks if there is exactly one healthy running pod (replicas:2)
@@ -934,6 +955,7 @@ kubectl scale deployment demo-app-demo-app -n default --replicas=1
 <details>
 <summary> ISSUES </summary>
 ### CHALLENGES ENCOUNTERED
+
 
 Port is already allocated
 Solution: I used port 8085 since port 8080 is currently being used by Jenkins.
