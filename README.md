@@ -557,6 +557,8 @@ kubectl scale deployment demo-app-demo-app -n default --replicas=0
 ```bash
 kubectl scale deployment demo-app-demo-app -n default --replicas=1
 ```
+
+
 ### 17: BUILDING GRAFANA DASHBOARD**
 **17a) Confirm prometheus has the metric on UI**
 Query:
@@ -736,6 +738,22 @@ j) Upgrade the release
 helm upgrade demo-app-uat ./charts/demo-app -n uat -f charts/demo-app/values-uat.yaml
 ```
 
+k) Adding filter to grafana
+
+
+
+### Implementing dynamic environment per pull request 
+
+> A dynamic environment is useful because:
+> - No collisions — two teammates working on different features never overwrite each other's test deployment, since each PR gets its own namespace
+> - Reviewers can actually click a live link — instead of a reviewer reading code and imagining what it does, they get a real, running URL/IP to click and test themselves
+> - Automatic resource reclaim — once the PR closes, the environment is deleted automatically, so you don't end up with old namespaces eating cluster resources
+
+> Uses node-ip : assigned-port
+
+
+
+
 ---
 ## Optional tasks
 
@@ -775,8 +793,8 @@ trivy image --format cyclonedx -o reports/docker-sbom.json sandrakinya/demo-app:
 ---
 
 <details>
-<summary> ## TESTS </summary>
-## Tests
+<summary> TESTS </summary>
+## TESTS
 ### 1. DEMONSTRATING SELF HEALING
 Kubernetes checks if there is exactly one healthy running pod (replicas:2)
 
@@ -914,8 +932,8 @@ kubectl scale deployment demo-app-demo-app -n default --replicas=1
 ---
 
 <details>
-<summary> ## CHALLENGES ENCOUNTERED</summary>
-### ISSUES
+<summary> ISSUES </summary>
+### CHALLENGES ENCOUNTERED
 
 Port is already allocated
 Solution: I used port 8085 since port 8080 is currently being used by Jenkins.
