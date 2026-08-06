@@ -954,7 +954,8 @@ kubectl scale deployment demo-app-demo-app -n default --replicas=1
 
 <details>
 <summary> ISSUES </summary>
-### CHALLENGES ENCOUNTERED
+
+## CHALLENGES ENCOUNTERED
 
 
 Port is already allocated
