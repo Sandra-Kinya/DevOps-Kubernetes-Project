@@ -5,10 +5,17 @@ metadata:
   labels:
     release: monitoring
 spec:
+
+  namespaceSelector:
+    matchNames:
+      - default
+      - uat
+
   selector:
     matchLabels:
       app: {{ include "demo-app.name" . }}
+
   endpoints:
   - port: http
     path: /metrics
-    interval: 15s
+    interval: 5s

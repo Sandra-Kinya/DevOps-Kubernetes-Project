@@ -1,0 +1,20 @@
+replicaCount: 2
+
+image:
+  tag: v.1.0
+
+ingress:
+  host: uat.demo.local
+
+config:
+  appGreeting: "Hello from UAT environment!"
+
+environment: uat
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 96Mi
+  limits:
+    cpu: 300m
+    memory: 192Mi

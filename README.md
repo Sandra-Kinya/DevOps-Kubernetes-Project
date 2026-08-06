@@ -99,8 +99,12 @@ WORKDIR /app
 COPY app/app.py .
 RUN pip install flask
 EXPOSE 8085
+RUN useradd -m appuser
+USER appuser
 CMD ["python", "app.py"]
 ```
+> Add a non-root user.
+
 
 ### 6: BUILDING DOCKER IMAGE
 ```bash
@@ -153,8 +157,32 @@ resources:
   limits:
     cpu: 200m
     memory: 128Mi
-```
 
+environment: dev
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+probes:
+  liveness:
+    path: /
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  readiness:
+    path: /
+    initialDelaySeconds: 3
+    periodSeconds: 5
+
+```
+> Integrate security
 
 ### 9: CREATE TEMPLATE FILES
 <details>
@@ -174,6 +202,7 @@ metadata:
   name: {{ include "demo-app.fullname" . }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 20
   selector:
     matchLabels:
       app: {{ include "demo-app.name" . }}
@@ -181,18 +210,40 @@ spec:
     metadata:
       labels:
         app: {{ include "demo-app.name" . }}
+        environment: {{ .Values.environment | default "dev" }}
     spec:
+      securityContext:
+        runAsNonRoot: {{ .Values.podSecurityContext.runAsNonRoot }}
+        runAsUser: {{ .Values.podSecurityContext.runAsUser }}
+        fsGroup: {{ .Values.podSecurityContext.fsGroup }}
       containers:
       - name: demo-app
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: {{ .Values.containerSecurityContext.allowPrivilegeEscalation }}
+          capabilities:
+            drop:
+            {{- range .Values.containerSecurityContext.capabilities.drop }}
+            - {{ . }}
+            {{- end }}
         ports:
         - containerPort: 8085
-
         envFrom:
         - configMapRef:
             name: {{ include "demo-app.fullname" . }}-config
-
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.probes.liveness.path }}
+            port: 8085
+          initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.probes.readiness.path }}
+            port: 8085
+          initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
         resources:
           requests:
             cpu: {{ .Values.resources.requests.cpu }}
@@ -528,7 +579,9 @@ Dashboards > New > Add visualization
 | Pod Restarts | `kube_pod_container_status_restarts_total{namespace="default"}` |
 | Running Pods | `count(kube_pod_status_phase{namespace="default", phase="Running"})` |
 
+
 ---
+
 
 ## Additional task
 ### PUSH IMAGE TO DOCKER HUB
@@ -582,6 +635,106 @@ kubectl get svc -n default
 
 > Any changes on app.py hence forth will require: docker build - docker push - kubectl delete pod.
 
+
+
+---
+
+## Additional task
+### Creating uat environment
+
+a) Creating a separate namespace 
+```bash
+kubectl create namespace uat
+```
+
+b) Creating uat-specific helm values override file
+```bash
+nano charts/demo-app/values-uat.yaml
+```
+
+```yaml
+replicaCount: 2
+image:
+  tag: v.1.0
+ingress:
+  host: uat.demo.local
+config:
+  appGreeting: "Hello from UAT environment!"
+environment: uat
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 96Mi
+  limits:
+    cpu: 300m
+    memory: 192Mi
+```
+
+c) Parameterizing ingress hostname
+> Since ingress.yaml hardcodes demo.local, make it configurabe by adding a placeholder
+```yaml
+spec:
+  rules:
+  - host: {{ .Values.ingress.host | default "demo.local" }}
+``` 
+
+> Add matching key to values.yaml
+
+```yaml
+ingress:
+  host: demo.local
+```
+> This lets demo.local and uat.demo.local share the same chart 
+
+d) Adding environment labels
+> These should be added to Deployment template so resources are identifiable at a glance.
+```yaml
+metadata:
+  labels:
+    app: {{ include "demo-app.name" . }}
+    environment: {{ .Values.environment | default "dev" }}
+```
+
+> To values-uat.yaml
+```yaml
+environment: uat
+```
+
+e) Deploying uat as a separate helm release
+```bash
+helm install demo-app-uat ./charts/demo-app -n uat -f charts/demo-app/values-uat.yaml
+```
+
+f) Update /etc/hosts for the new hostname
+
+
+g) Verify
+```bash
+kubectl get pods -n uat
+kubectl get svc -n uat
+kubectl get ingress -n uat
+curl http://uat.demo.local/
+```
+
+h) Adding a namespaceSelector to servicemonitor.yaml
+> Tells prometheus to scrape Services in both the default and uat namespaces.
+```bash
+namespaceSelector:
+    matchNames:
+      - default
+      - uat
+```
+
+i) Upgrade helm release
+```bash
+helm upgrade demo-app ./charts/demo-app -n default
+```
+
+j) Upgrade the release
+```bash
+helm upgrade demo-app-uat ./charts/demo-app -n uat -f charts/demo-app/values-uat.yaml
+```
 
 ---
 ## Optional tasks
