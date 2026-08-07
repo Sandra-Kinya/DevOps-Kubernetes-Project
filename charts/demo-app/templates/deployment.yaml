@@ -4,6 +4,7 @@ metadata:
   name: {{ include "demo-app.fullname" . }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 20
   selector:
     matchLabels:
       app: {{ include "demo-app.name" . }}
@@ -11,18 +12,40 @@ spec:
     metadata:
       labels:
         app: {{ include "demo-app.name" . }}
+        environment: {{ .Values.environment | default "dev" }}
     spec:
+      securityContext:
+        runAsNonRoot: {{ .Values.podSecurityContext.runAsNonRoot }}
+        runAsUser: {{ .Values.podSecurityContext.runAsUser }}
+        fsGroup: {{ .Values.podSecurityContext.fsGroup }}
       containers:
       - name: demo-app
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: {{ .Values.containerSecurityContext.allowPrivilegeEscalation }}
+          capabilities:
+            drop:
+            {{- range .Values.containerSecurityContext.capabilities.drop }}
+            - {{ . }}
+            {{- end }}
         ports:
         - containerPort: 8085
-
         envFrom:
         - configMapRef:
             name: {{ include "demo-app.fullname" . }}-config
-
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.probes.liveness.path }}
+            port: 8085
+          initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.probes.readiness.path }}
+            port: 8085
+          initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
         resources:
           requests:
             cpu: {{ .Values.resources.requests.cpu }}

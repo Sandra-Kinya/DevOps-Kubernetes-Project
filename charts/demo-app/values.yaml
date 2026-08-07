@@ -1,9 +1,9 @@
 replicaCount: 1
 
 image:
-  repository: demo-app
+  repository: sandrakinya/demo-app
   tag: v.1.0
-  pullPolicy: Never
+  pullPolicy: IfNotPresent
 
 service:
   type: ClusterIP
@@ -19,3 +19,29 @@ resources:
   limits:
     cpu: 200m
     memory: 128Mi
+
+ingress:
+  host: demo.local
+  
+environment: dev
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+probes:
+  liveness:
+    path: /
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  readiness:
+    path: /
+    initialDelaySeconds: 3
+    periodSeconds: 5

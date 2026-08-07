@@ -219,3 +219,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Vim swap files
+*.swp
+*.swo
+*.swx
+
+# Temporary editor files
+*~

@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "demo-app.fullname" . }}-rules
+  labels:
+    release: monitoring
+spec:
+  groups:
+  - name: demo-app.rules
+    rules:
+    - alert: DemoAppPodDown
+      expr: up{job="demo-app-demo-app"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Demo app pod is down"
+        description: "The demo-app target has been unreachable for more than 1 minute."
