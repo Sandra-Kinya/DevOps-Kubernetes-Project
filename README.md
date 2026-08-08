@@ -187,7 +187,7 @@ probes:
 
 ### 9: CREATE TEMPLATE FILES
 <details>
-<summary> ## Template files</summary>
+<summary> Template files</summary>
 
 ```bash
 cd template
@@ -759,18 +759,99 @@ helm upgrade demo-app-uat ./charts/demo-app -n uat -f charts/demo-app/values-uat
 ```
 
 k) Adding filter to grafana
+<image>
 
-
-
-### Implementing dynamic environment per pull request 
+### Deploying a dynamic UAT environment
 
 > A dynamic environment is useful because:
-> - No collisions — two teammates working on different features never overwrite each other's test deployment, since each PR gets its own namespace
-> - Reviewers can actually click a live link — instead of a reviewer reading code and imagining what it does, they get a real, running URL/IP to click and test themselves
-> - Automatic resource reclaim — once the PR closes, the environment is deleted automatically, so you don't end up with old namespaces eating cluster resources
+> - No collisions
+> - Reviewers can actually click a live link
+> - Automatic resource reclaim
 
 > Uses node-ip : assigned-port
 
+
+- Creates an isolated, disposable uat environment in its own namespace.
+- Exposed via NodePort (no /etc/hosts editing needed). 
+- Simulates what a CI pipeline would do automatically per Pull Request.
+
+- Usage of the script:
+  - ./deploy-uat-env.sh <id>              deploy a test environment
+  - ./deploy-uat-env.sh --cleanup <id>    tear it down
+
+- <id> should be a real PR number when available. If omitted on deploy, a timestamp is used instead.
+
+```bash
+#!/bin/bash
+set -e
+
+CHART_PATH="./charts/demo-app"
+
+usage() {
+  echo "Usage:"
+  echo "  $0 <id>              Deploy a test environment"
+  echo "  $0 --cleanup <id>    Tear down a test environment"
+  exit 1
+}
+
+# Cleanup
+if [ "$1" == "--cleanup" ]; then
+  if [ -z "$2" ]; then
+    echo "Error: missing <id> for cleanup."
+    usage
+  fi
+
+  ID="$2"
+  NAMESPACE="test-${ID}"
+  RELEASE="demo-app-test-${ID}"
+
+  echo "Tearing down test environment: ${NAMESPACE}"
+
+  if ! kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1; then
+    echo "Namespace ${NAMESPACE} does not exist. Nothing to clean up."
+    exit 0
+  fi
+
+  helm uninstall "${RELEASE}" -n "${NAMESPACE}" || echo "Release already removed."
+  kubectl delete namespace "${NAMESPACE}"
+
+  echo "Done. ${NAMESPACE} has been removed."
+  exit 0
+fi
+
+# Deploy mode
+ID="${1:-$(date +%s)}"
+NAMESPACE="test-${ID}"
+RELEASE="demo-app-test-${ID}"
+
+echo "Deploying test environment: ${NAMESPACE}"
+
+kubectl create namespace "${NAMESPACE}"
+
+helm install "${RELEASE}" "${CHART_PATH}" \
+  -n "${NAMESPACE}" \
+  --set replicaCount=1 \
+  --set environment=test \
+  --set service.type=NodePort
+
+echo ""
+echo "Waiting for pod to be ready..."
+kubectl wait --for=condition=Ready pod -l app=demo-app -n "${NAMESPACE}" --timeout=60s
+
+echo ""
+echo "Test environment is up."
+kubectl get pods -n "${NAMESPACE}"
+kubectl get svc -n "${NAMESPACE}"
+
+NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+NODE_PORT=$(kubectl get svc "${RELEASE}-demo-app" -n "${NAMESPACE}" -o jsonpath='{.spec.ports[0].nodePort}')
+
+echo ""
+echo "Access the app at: http://${NODE_IP}:${NODE_PORT}/"
+echo ""
+echo "To tear down this environment, run:"
+echo "  $0 --cleanup ${ID}"
+```
 
 
 
