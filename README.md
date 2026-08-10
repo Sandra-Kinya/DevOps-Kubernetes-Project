@@ -597,13 +597,81 @@ Dashboards > New > Add visualization
 **Simulating self healing, scaling and errors**
 
 > Ran these commands and observe the changes on the dashboard in grafana
-> Find video attached.
+> Find video attached
+
+
+### 18: EXPORT GRAFANA DASHBOARDS AS JSON AND PROVISION VIA CONFIG-MAP 
+
+**Dashboards as Code (Grafana ConfigMap Provisioning)**
+
+The Grafana "Demo App Overview" dashboard is stored as version-controlled
+JSON at `monitoring/dashboards/demo-app-overview.json`, rather than existing
+only inside Grafana's UI. It is provisioned into the cluster as a ConfigMap
+labeled `grafana_dashboard: "1"`, which the kube-prometheus-stack sidecar
+container watches for and automatically loads into Grafana — no manual
+dashboard import is required after a fresh install.
+
+This means the dashboard is fully reproducible: if the monitoring stack is
+uninstalled and reinstalled from scratch, reapplying this ConfigMap restores
+the exact same dashboard without any manual re-creation in the UI.
+
+**Regenerating after a UI edit:**
+
+If the dashboard is edited directly in Grafana, those changes only exist in
+Grafana's own storage until they are exported back into this file. After
+making a UI change:
+
+1. Grafana → dashboard → gear icon → JSON Model → copy
+2. Paste the copied JSON into `monitoring/dashboards/demo-app-overview.json`
+3. Run `make dashboard-update` to regenerate and apply the ConfigMap
+
+Manual equivalent (what the Makefile target automates):
+
+    kubectl create configmap demo-app-overview-dashboard \
+      --from-file=monitoring/dashboards/demo-app-overview.json \
+      -n monitoring --dry-run=client -o yaml \
+      | kubectl label --local -f - grafana_dashboard="1" -o yaml \
+      > monitoring/dashboards/demo-app-overview-configmap.yaml
+
+    kubectl apply -f monitoring/dashboards/demo-app-overview-configmap.yaml
+
+**Note:** this is one-directional 
+- after editing the ConfigMap or the JSON file `kubectl apply` is run again
+- after editing the Grafana UI it should be re-exported.
+- the make dashboard-update command combines: regenerating the ConfigMap YAML with the correct label and applying it into one command.
 
 
 ---
 
+## Optional tasks
 
-## Additional task
+
+### CREATING A CONFIG FILE
+
+a) Edit app.py to read a configurable greeting message from an environment variable. The greeting message will be stored in the configMap.
+
+b) Rebuild and reimport the image since app.py changed.
+```bash
+cd ~/Sandra_tcs-devop-project-C
+docker build -t demo-app:v.1.0 .
+docker save demo-app:v.1.0 -o demo-app.tar
+sudo k3s ctr -n k8s.io images import demo-app.tar
+```
+
+c) Edit deployment.yaml - Add an envFrom block under the existing container spec.
+```bash
+envFrom:
+        - configMapRef:
+            name: {{ include "demo-app.fullname" . }}-config
+```
+
+d) Apply the changes
+```bash
+cd ~/Sandra_tcs-devop-project-C
+helm upgrade demo-app ./charts/demo-app
+```
+
+
 ### PUSH IMAGE TO DOCKER HUB
 
 ** Build image --> Push to docker hub --> Pull into K3s**
@@ -659,109 +727,7 @@ kubectl get svc -n default
 
 
 
----
-
-## Additional task
-### Creating uat environment
-
-a) Creating a separate namespace 
-```bash
-kubectl create namespace uat
-```
-
-b) Creating uat-specific helm values override file
-```bash
-nano charts/demo-app/values-uat.yaml
-```
-
-```yaml
-replicaCount: 2
-image:
-  tag: v.1.0
-ingress:
-  host: uat.demo.local
-config:
-  appGreeting: "Hello from UAT environment!"
-environment: uat
-
-resources:
-  requests:
-    cpu: 100m
-    memory: 96Mi
-  limits:
-    cpu: 300m
-    memory: 192Mi
-```
-
-c) Parameterizing ingress hostname
-> Since ingress.yaml hardcodes demo.local, make it configurabe by adding a placeholder
-```yaml
-spec:
-  rules:
-  - host: {{ .Values.ingress.host | default "demo.local" }}
-``` 
-
-> Add matching key to values.yaml
-
-```yaml
-ingress:
-  host: demo.local
-```
-> This lets demo.local and uat.demo.local share the same chart 
-
-d) Adding environment labels
-> These should be added to Deployment template so resources are identifiable at a glance.
-```yaml
-metadata:
-  labels:
-    app: {{ include "demo-app.name" . }}
-    environment: {{ .Values.environment | default "dev" }}
-```
-
-> To values-uat.yaml
-```yaml
-environment: uat
-```
-
-e) Deploying uat as a separate helm release
-```bash
-helm install demo-app-uat ./charts/demo-app -n uat -f charts/demo-app/values-uat.yaml
-```
-
-f) Update /etc/hosts for the new hostname
-
-
-g) Verify
-```bash
-kubectl get pods -n uat
-kubectl get svc -n uat
-kubectl get ingress -n uat
-curl http://uat.demo.local/
-```
-
-h) Adding a namespaceSelector to servicemonitor.yaml
-> Tells prometheus to scrape Services in both the default and uat namespaces.
-```bash
-namespaceSelector:
-    matchNames:
-      - default
-      - uat
-```
-
-i) Upgrade helm release
-```bash
-helm upgrade demo-app ./charts/demo-app -n default
-```
-
-j) Upgrade the release
-```bash
-helm upgrade demo-app-uat ./charts/demo-app -n uat -f charts/demo-app/values-uat.yaml
-```
-
-k) Adding filter to grafana
-<image>
-
-### Deploying a dynamic UAT environment
+### DEPLOYING A DYNAMIC UAT ENVIRONMENT
 
 > A dynamic environment is useful because:
 > - No collisions
@@ -772,7 +738,7 @@ k) Adding filter to grafana
 
 
 - Creates an isolated, disposable uat environment in its own namespace.
-- Exposed via NodePort (no /etc/hosts editing needed). 
+- Exposed via NodePort (no /etc/hosts editing needed).
 - Simulates what a CI pipeline would do automatically per Pull Request.
 
 - Usage of the script:
@@ -798,7 +764,7 @@ usage() {
 if [ "$1" == "--cleanup" ]; then
   if [ -z "$2" ]; then
     echo "Error: missing <id> for cleanup."
-    usage
+usage
   fi
 
   ID="$2"
@@ -853,35 +819,187 @@ echo "To tear down this environment, run:"
 echo "  $0 --cleanup ${ID}"
 ```
 
+>  Adding filter to grafana
+<image>
+
+
+
+### CREATING A MAKEFILE
+
+> This script wraps the existing manual command sequences into single, repeatable targets.
+
+```bash
+IMAGE_NAME := sandrakinya/demo-app
+IMAGE_TAG  := v.1.0
+CHART_PATH := ./charts/demo-app
+NAMESPACE  := default
+DASHBOARD_DIR := monitoring/dashboards
+DASHBOARD_NAME := demo-app-overview
+
+.PHONY: help nodes helm-check \
+        build push deploy delete-pod \
+        install upgrade uninstall reinstall \
+        pods svc ingress port-forward-app curl-app \
+        monitoring-namespace monitoring-install monitoring-uninstall \
+        port-forward-prometheus port-forward-grafana \
+        uat-namespace uat-install uat-uninstall \
+        scan-image scan-config sbom \
+        up down status clean
+	dashboard-update
+
+help:
+	@echo "Available targets:"
+	@echo "  make nodes                 - verify k3s cluster is up"
+	@echo "  make build                 - docker build the app image"
+	@echo "  make push                  - push image to Docker Hub"
+	@echo "  make deploy                - build + push + delete pod (pick up new image)"
+	@echo "  make install               - helm install demo-app"
+	@echo "  make upgrade               - helm upgrade demo-app"
+	@echo "  make uninstall             - helm uninstall demo-app"
+	@echo "  make reinstall             - uninstall + install"
+	@echo "  make pods                  - kubectl get pods"
+	@echo "  make svc                   - kubectl get svc"
+	@echo "  make ingress               - kubectl get ingress"
+	@echo "  make port-forward-app      - port-forward the app to localhost:8085"
+	@echo "  make curl-app              - curl the app's / and /metrics"
+	@echo "  make monitoring-install    - install kube-prometheus-stack"
+	@echo "  make port-forward-grafana  - port-forward Grafana to localhost:3001"
+	@echo "  make port-forward-prometheus - port-forward Prometheus to localhost:9091"
+	@echo "  make uat-install           - deploy the UAT release"
+	@echo "  make scan-image            - trivy image scan (HIGH/CRITICAL)"
+	@echo "  make sbom                  - generate SBOM via trivy"
+	@echo "  make up                    - full stack: namespaces + monitoring + app"
+	@echo "  make down                  - uninstall app + monitoring"
+	@echo "  make status                - quick health snapshot of everything"
+	@echo "  make dashboard-update      - regenerate + apply the dashboard ConfigMap after a UI edit"
+
+
+# ---- Cluster check ----
+nodes:
+	sudo k3s kubectl get nodes
+
+helm-check:
+	helm list -A
+
+# ---- Image build / push / deploy ----
+build:
+	docker build -t $(IMAGE_NAME):$(IMAGE_TAG) .
+
+push: build
+	docker push $(IMAGE_NAME):$(IMAGE_TAG)
+
+delete-pod:
+	kubectl delete pod -l app=demo-app -n $(NAMESPACE)
+
+deploy: push delete-pod
+	@echo "Deployed $(IMAGE_NAME):$(IMAGE_TAG) — waiting for rollout..."
+	kubectl rollout status deployment/demo-app-demo-app -n $(NAMESPACE)
+
+# ---- Helm lifecycle ----
+install:
+	helm install demo-app $(CHART_PATH)
+
+upgrade:
+	helm upgrade demo-app $(CHART_PATH)
+
+uninstall:
+	helm uninstall demo-app || true
+
+reinstall: uninstall install
+
+# ---- App inspection ----
+pods:
+	kubectl get pods -n $(NAMESPACE)
+
+svc:
+	kubectl get svc -n $(NAMESPACE)
+
+ingress:
+	kubectl get ingress -n $(NAMESPACE)
+
+port-forward-app:
+	kubectl port-forward svc/demo-app-demo-app 8085:8085 -n $(NAMESPACE)
+
+curl-app:
+	curl http://localhost:8085/
+	@echo ""
+	curl http://localhost:8085/metrics
+
+# ---- Monitoring ----
+monitoring-namespace:
+	kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+
+monitoring-install: monitoring-namespace
+	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
+	helm repo update
+	helm install monitoring prometheus-community/kube-prometheus-stack \
+	  -n monitoring -f monitoring/monitoring-values.yaml
+
+monitoring-uninstall:
+	helm uninstall monitoring -n monitoring || true
+
+port-forward-prometheus:
+	kubectl port-forward svc/monitoring-kube-prometheus-prometheus -n monitoring 9091:9090
+
+port-forward-grafana:
+	kubectl port-forward svc/monitoring-grafana -n monitoring 3001:80
+
+dashboard-update:
+        @echo "Regenerating ConfigMap from $(DASHBOARD_DIR)/$(DASHBOARD_NAME).json ..."
+        kubectl create configmap $(DASHBOARD_NAME)-dashboard \
+          --from-file=$(DASHBOARD_DIR)/$(DASHBOARD_NAME).json \
+          -n monitoring --dry-run=client -o yaml | \
+        kubectl label --local -f - grafana_dashboard="1" -o yaml \
+          > $(DASHBOARD_DIR)/$(DASHBOARD_NAME)-configmap.yaml
+        kubectl apply -f $(DASHBOARD_DIR)/$(DASHBOARD_NAME)-configmap.yaml
+        @echo "Done. Refresh Grafana in ~30-60s to see the update."
+
+
+# ---- UAT environment ----
+uat-namespace:
+	kubectl create namespace uat --dry-run=client -o yaml | kubectl apply -f -
+
+uat-install: uat-namespace
+	helm install demo-app-uat $(CHART_PATH) -n uat -f $(CHART_PATH)/values-uat.yaml
+
+uat-uninstall:
+	helm uninstall demo-app-uat -n uat || true
+
+# ---- Security scanning ----
+scan-image:
+	trivy image --severity HIGH,CRITICAL $(IMAGE_NAME):$(IMAGE_TAG)
+
+scan-config:
+	trivy config $(CHART_PATH)/templates
+
+sbom:
+	mkdir -p reports
+	trivy image --format cyclonedx -o reports/docker-sbom.json $(IMAGE_NAME):$(IMAGE_TAG)
+
+# ---- Full lifecycle shortcuts ----
+up: nodes monitoring-install install
+	@echo "Stack is up. Run 'make port-forward-app' or 'make port-forward-grafana' next."
+
+down: uninstall monitoring-uninstall
+	@echo "App and monitoring uninstalled."
+
+status:
+	@echo "--- Nodes ---"
+	@sudo k3s kubectl get nodes
+	@echo "--- Helm releases ---"
+	@helm list -A
+	@echo "--- App pods ---"
+	@kubectl get pods -n $(NAMESPACE)
+	@echo "--- Monitoring pods ---"
+	@kubectl get pods -n monitoring
+
+clean: down
+	@echo "Cleaned up app and monitoring releases (namespaces left intact)."
+```
 
 
 ---
-## Optional tasks
 
-### CREATING A CONFIG FILE
-
-a) Edit app.py to read a configurable greeting message from an environment variable. The greeting message will be stored in the configMap.
-
-b) Rebuild and reimport the image since app.py changed.
-```bash
-cd ~/Sandra_tcs-devop-project-C
-docker build -t demo-app:v.1.0 .
-docker save demo-app:v.1.0 -o demo-app.tar
-sudo k3s ctr -n k8s.io images import demo-app.tar
-```
-
-c) Edit deployment.yaml - Add an envFrom block under the existing container spec.
-```bash
-envFrom:
-        - configMapRef:
-            name: {{ include "demo-app.fullname" . }}-config
-```
-
-d) Apply the changes
-```bash
-cd ~/Sandra_tcs-devop-project-C
-helm upgrade demo-app ./charts/demo-app
-```
 
 ### SBOM REPORT
 a) Install trivy
@@ -897,6 +1015,7 @@ trivy image --format cyclonedx -o reports/docker-sbom.json sandrakinya/demo-app:
 <summary> TESTS </summary>
 
 ## TESTS
+
 ### 1. DEMONSTRATING SELF HEALING
 Kubernetes checks if there is exactly one healthy running pod (replicas:2)
 
@@ -1010,7 +1129,7 @@ kube-prometheus-stack did not create persistent volumes therefore I added persis
 https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/1574b7d575fda566c5813f61ba2887b3a334388d/Implementation_videos/PersistentStorage.mp4
 
 
-### Test scaling
+### 4. TEST SCALING
 **a) Scale up manually**
 ```bash
 kubectl scale deployment demo-app-demo-app -n default --replicas=3
