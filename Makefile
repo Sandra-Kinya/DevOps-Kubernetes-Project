@@ -1,5 +1,5 @@
 IMAGE_NAME := sandrakinya/demo-app
-IMAGE_TAG  := v.1.0
+IMAGE_TAG  := $(shell git rev-parse --short HEAD)
 CHART_PATH := ./charts/demo-app
 NAMESPACE  := default
 DASHBOARD_DIR := monitoring/dashboards
@@ -57,11 +57,13 @@ build:
 push: build
 	docker push $(IMAGE_NAME):$(IMAGE_TAG)
 
-delete-pod:
-	kubectl delete pod -l app=demo-app -n $(NAMESPACE)
-
-deploy: push delete-pod
-	@echo "Deployed $(IMAGE_NAME):$(IMAGE_TAG) — waiting for rollout..."
+deploy: push
+	@echo "Deploying $(IMAGE_NAME):$(IMAGE_TAG)..."
+	helm upgrade demo-app $(CHART_PATH) \
+		--set image.repository=$(IMAGE_NAME) \
+		--set image.tag=$(IMAGE_TAG) \
+		-n $(NAMESPACE)
+	@echo "Waiting for rollout..."
 	kubectl rollout status deployment/demo-app-demo-app -n $(NAMESPACE)
 
 # ---- Helm lifecycle ----
