@@ -569,6 +569,7 @@ kubectl scale deployment demo-app-demo-app -n default --replicas=1
 
 
 ### 17: BUILDING GRAFANA DASHBOARD**
+
 **17a) Confirm prometheus has the metric on UI**
 Query:
 demo_app_custom_metric
@@ -592,6 +593,23 @@ Dashboards > New > Add visualization
 
 
 <img width="1833" height="940" alt="Grafana dashboard" src="https://github.com/user-attachments/assets/7b504d89-90d9-41ca-bf00-8ca9f2c9c5c4" />
+
+**17e) Creating grafana secret**
+
+Get the admin password
+```bash
+kubectl get secret monitoring-grafana -n monitoring \
+  -o jsonpath="{.data.admin-password}" | base64 --decode
+```
+
+
+Create the grafana secret
+```bash
+kubectl create secret generic grafana-admin-credentials \
+  --from-literal=admin-user=admin \
+  --from-literal=admin-password='PASSWORD-FROM-THE-PREVIOUS-COMMAND' \
+  -n monitoring
+```
 
 
 **Simulating self healing, scaling and errors**

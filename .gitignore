@@ -227,3 +227,8 @@ __marimo__/
 
 # Temporary editor files
 *~
+
+#secrets
+*.secret
+.env
+.env.*
