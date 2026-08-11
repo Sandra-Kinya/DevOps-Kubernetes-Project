@@ -164,7 +164,7 @@ dashboard-update:
 
 # ---- Dynamic UAT environment ----
 
-uat-install:
+uat-install: push
 	@IMAGE_NAME="$(IMAGE_NAME)" IMAGE_TAG="$(IMAGE_TAG)" ./scripts/deploy-uat-env.sh
 
 uat-clean:

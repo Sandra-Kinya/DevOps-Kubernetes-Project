@@ -69,12 +69,18 @@ helm install "${RELEASE}" "${CHART_PATH}" \
     --set image.tag="${IMAGE_TAG}"
 
 echo ""
-echo "Waiting for pod to be ready..."
+echo "Finding deployment..."
 
-kubectl wait \
-    --for=condition=Ready \
-    pod \
-    -l app=demo-app \
+DEPLOYMENT_NAME=$(kubectl get deployment \
+    -n "${NAMESPACE}" \
+    -o jsonpath='{.items[0].metadata.name}')
+
+echo "Deployment: ${DEPLOYMENT_NAME}"
+echo ""
+echo "Waiting for deployment to be ready..."
+
+kubectl rollout status \
+    deployment/"${DEPLOYMENT_NAME}" \
     -n "${NAMESPACE}" \
     --timeout=120s
 
