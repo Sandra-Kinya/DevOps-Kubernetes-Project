@@ -19,6 +19,32 @@ monitoring-values.yaml
 app/app.py
 
 ---
-**Command used to generate the SBOM file**
-
+**SBOM FILE**
+**Command**
+```bash
 trivy image --format cyclonedx -o reports/docker-sbom.json sandrakinya/demo-app:v.1.0
+```
+
+---
+**SECURITY**
+
+**Image security**
+
+```bash
+trivy image --severity HIGH,CRITICAL --output reports/image-scan.txt sandrakinya/demo-app:v.1.0
+```
+
+**Scan Dockerfile for misconfigurations**
+
+> Separate from package vulnerabilities — this checks the Dockerfile itself for bad practices (e.g., running as root, missing HEALTHCHECK).
+```bash
+trivy config --output reports/dockerfile-scan.txt Dockerfile
+```
+
+**Scan Helm chart / Kubernetes manifests**
+
+> Checks helm configuration files for security misconfigurations - for missing resource limits, privileged containers, missing security contexts.
+
+```bash
+trivy config --output reports/helm-chart-scan.txt charts/demo-app/templates
+```
