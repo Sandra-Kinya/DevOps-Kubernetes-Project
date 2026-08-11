@@ -766,76 +766,115 @@ kubectl get svc -n default
 - <id> should be a real PR number when available. If omitted on deploy, a timestamp is used instead.
 
 ```bash
-#!/bin/bash
+!/bin/bash
+
 set -e
 
 CHART_PATH="./charts/demo-app"
 
+IMAGE_NAME="${IMAGE_NAME:-sandrakinya/demo-app}"
+IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
+
 usage() {
-  echo "Usage:"
-  echo "  $0 <id>              Deploy a test environment"
-  echo "  $0 --cleanup <id>    Tear down a test environment"
-  exit 1
+    echo "Usage:"
+    echo "  $0 [ID]              Deploy a dynamic test environment"
+    echo "  $0 --cleanup <ID>    Tear down a test environment"
+    exit 1
 }
 
-# Cleanup
-if [ "$1" == "--cleanup" ]; then
-  if [ -z "$2" ]; then
-    echo "Error: missing <id> for cleanup."
-usage
-  fi
+# ---- Cleanup mode ----
 
-  ID="$2"
-  NAMESPACE="test-${ID}"
-  RELEASE="demo-app-test-${ID}"
+if [ "$1" = "--cleanup" ]; then
+    if [ -z "$2" ]; then
+        echo "Error: missing environment ID for cleanup."
+        usage
+    fi
 
-  echo "Tearing down test environment: ${NAMESPACE}"
+    ID="$2"
+    NAMESPACE="test-${ID}"
+    RELEASE="demo-app-test-${ID}"
 
-  if ! kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1; then
-    echo "Namespace ${NAMESPACE} does not exist. Nothing to clean up."
+    echo "Tearing down test environment: ${NAMESPACE}"
+
+    if ! kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1; then
+        echo "Namespace ${NAMESPACE} does not exist. Nothing to clean up."
+        exit 0
+    fi
+
+    helm uninstall "${RELEASE}" -n "${NAMESPACE}" || \
+        echo "Release ${RELEASE} is already removed."
+
+    kubectl delete namespace "${NAMESPACE}"
+
+    echo "Done. ${NAMESPACE} has been removed."
     exit 0
-  fi
-
-  helm uninstall "${RELEASE}" -n "${NAMESPACE}" || echo "Release already removed."
-  kubectl delete namespace "${NAMESPACE}"
-
-  echo "Done. ${NAMESPACE} has been removed."
-  exit 0
 fi
 
-# Deploy mode
+# ---- Deploy mode ----
+
 ID="${1:-$(date +%s)}"
 NAMESPACE="test-${ID}"
 RELEASE="demo-app-test-${ID}"
 
-echo "Deploying test environment: ${NAMESPACE}"
+echo "Deploying dynamic test environment"
+echo "Namespace: ${NAMESPACE}"
+echo "Release:   ${RELEASE}"
+echo "Image:     ${IMAGE_NAME}:${IMAGE_TAG}"
+echo ""
+
+# ---- Create namespace ----
 
 kubectl create namespace "${NAMESPACE}"
 
+# ---- Deploy application ----
+
 helm install "${RELEASE}" "${CHART_PATH}" \
-  -n "${NAMESPACE}" \
-  --set replicaCount=1 \
-  --set environment=test \
-  --set service.type=NodePort
+    -n "${NAMESPACE}" \
+    --set replicaCount=1 \
+    --set environment=test \
+    --set service.type=NodePort \
+    --set image.repository="${IMAGE_NAME}" \
+    --set image.tag="${IMAGE_TAG}"
 
 echo ""
-echo "Waiting for pod to be ready..."
-kubectl wait --for=condition=Ready pod -l app=demo-app -n "${NAMESPACE}" --timeout=60s
+echo "Finding deployment..."
+
+DEPLOYMENT_NAME=$(kubectl get deployment \
+    -n "${NAMESPACE}" \
+    -o jsonpath='{.items[0].metadata.name}')
+
+echo "Deployment: ${DEPLOYMENT_NAME}"
+echo ""
+echo "Waiting for deployment to be ready..."
+
+kubectl rollout status \
+deployment/"${DEPLOYMENT_NAME}" \
+    -n "${NAMESPACE}" \
+    --timeout=120s
 
 echo ""
 echo "Test environment is up."
+
 kubectl get pods -n "${NAMESPACE}"
 kubectl get svc -n "${NAMESPACE}"
 
-NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
-NODE_PORT=$(kubectl get svc "${RELEASE}-demo-app" -n "${NAMESPACE}" -o jsonpath='{.spec.ports[0].nodePort}')
+# ---- Get access information ----
+
+NODE_IP=$(kubectl get nodes \
+    -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+
+NODE_PORT=$(kubectl get svc "${RELEASE}-demo-app" \
+    -n "${NAMESPACE}" \
+    -o jsonpath='{.spec.ports[0].nodePort}')
 
 echo ""
+echo "Application image: ${IMAGE_NAME}:${IMAGE_TAG}"
 echo "Access the app at: http://${NODE_IP}:${NODE_PORT}/"
 echo ""
 echo "To tear down this environment, run:"
 echo "  $0 --cleanup ${ID}"
-```
+
+ ```
 
 >  Adding filter to grafana
 <image>
@@ -848,11 +887,14 @@ echo "  $0 --cleanup ${ID}"
 
 ```bash
 IMAGE_NAME := sandrakinya/demo-app
-IMAGE_TAG  := $(shell git rev-parse --short HEAD)
+IMAGE_TAG ?= $(shell git rev-parse --short HEAD)
+
 CHART_PATH := ./charts/demo-app
-NAMESPACE  := default
+NAMESPACE := default
+
 DASHBOARD_DIR := monitoring/dashboards
 DASHBOARD_NAME := demo-app-overview
+
 
 .PHONY: help nodes helm-check \
         build push deploy delete-pod \
@@ -860,161 +902,204 @@ DASHBOARD_NAME := demo-app-overview
         pods svc ingress port-forward-app curl-app \
         monitoring-namespace monitoring-install monitoring-uninstall \
         port-forward-prometheus port-forward-grafana \
-        uat-namespace uat-install uat-uninstall \
+        uat-install uat-clean \
         scan-image scan-config sbom \
+        dashboard-update \
         up down status clean
-	dashboard-update
+
+
+# ---- Help ----
 
 help:
-	@echo "Available targets:"
-	@echo "  make nodes                 - verify k3s cluster is up"
-	@echo "  make build                 - docker build the app image"
-	@echo "  make push                  - push image to Docker Hub"
-	@echo "  make deploy                - build + push + delete pod (pick up new image)"
-	@echo "  make install               - helm install demo-app"
-	@echo "  make upgrade               - helm upgrade demo-app"
-	@echo "  make uninstall             - helm uninstall demo-app"
-	@echo "  make reinstall             - uninstall + install"
-	@echo "  make pods                  - kubectl get pods"
-	@echo "  make svc                   - kubectl get svc"
-	@echo "  make ingress               - kubectl get ingress"
-	@echo "  make port-forward-app      - port-forward the app to localhost:8085"
-	@echo "  make curl-app              - curl the app's / and /metrics"
-	@echo "  make monitoring-install    - install kube-prometheus-stack"
-	@echo "  make port-forward-grafana  - port-forward Grafana to localhost:3001"
+        @echo "Available targets:"
+        @echo "  make nodes                   - verify k3s cluster is up"
+        @echo "  make build                   - build the app image"
+        @echo "  make push                    - push image to Docker Hub"
+        @echo "  make deploy                  - build, push and deploy the current Git SH>
+        @echo "  make install                 - install demo-app with the current Git SHA>
+        @echo "  make upgrade                 - upgrade demo-app with the current Git SHA>
+        @echo "  make uninstall               - uninstall demo-app"
+        @echo "  make reinstall               - uninstall and install demo-app"
+        @echo "  make pods                    - get application pods"
+        @echo "  make svc                     - get application Service"
+        @echo "  make ingress                 - get application Ingress"
+        @echo "  make port-forward-app        - port-forward the app to localhost:8085"
+        @echo "  make curl-app                - test the app through the Ingress"
+        @echo "  make monitoring-install      - install kube-prometheus-stack"
+        @echo "  make monitoring-uninstall    - uninstall kube-prometheus-stack"
+        @echo "  make port-forward-grafana    - port-forward Grafana to localhost:3001"
 	@echo "  make port-forward-prometheus - port-forward Prometheus to localhost:9091"
-	@echo "  make uat-install           - deploy the UAT release"
-	@echo "  make scan-image            - trivy image scan (HIGH/CRITICAL)"
-	@echo "  make sbom                  - generate SBOM via trivy"
-	@echo "  make up                    - full stack: namespaces + monitoring + app"
-	@echo "  make down                  - uninstall app + monitoring"
-	@echo "  make status                - quick health snapshot of everything"
-	@echo "  make dashboard-update      - regenerate + apply the dashboard ConfigMap after a UI edit"
+        @echo "  make uat-install             - create a dynamic UAT environment"
+        @echo "  make uat-clean ID=<id>       - remove a dynamic UAT environment"
+        @echo "  make scan-image              - scan the image for HIGH and CRITICAL vuln>
+        @echo "  make scan-config             - scan Helm configuration with Trivy"
+        @echo "  make sbom                    - generate the image SBOM"
+        @echo "  make dashboard-update        - regenerate and apply the Grafana dashboar>
+        @echo "  make up                      - start monitoring and the application"
+        @echo "  make down                    - uninstall application and monitoring"
+        @echo "  make status                  - show cluster and application status"
+        @echo "  make clean                   - clean application and monitoring releases"
 
 
 # ---- Cluster check ----
+
 nodes:
-	sudo k3s kubectl get nodes
+        sudo k3s kubectl get nodes
 
 helm-check:
-	helm list -A
+        helm list -A
+
 
 # ---- Image build / push / deploy ----
+
 build:
-	docker build -t $(IMAGE_NAME):$(IMAGE_TAG) .
+        docker build -t $(IMAGE_NAME):$(IMAGE_TAG) .
 
 push: build
-	docker push $(IMAGE_NAME):$(IMAGE_TAG)
+        docker push $(IMAGE_NAME):$(IMAGE_TAG)
+
+delete-pod:
+        kubectl delete pod -l app=demo-app -n $(NAMESPACE)
 
 deploy: push
-	@echo "Deploying $(IMAGE_NAME):$(IMAGE_TAG)..."
-	helm upgrade demo-app $(CHART_PATH) \
-		--set image.repository=$(IMAGE_NAME) \
-		--set image.tag=$(IMAGE_TAG) \
-		-n $(NAMESPACE)
-	@echo "Waiting for rollout..."
-	kubectl rollout status deployment/demo-app-demo-app -n $(NAMESPACE)
+        @echo "Deploying $(IMAGE_NAME):$(IMAGE_TAG)..."
+        helm upgrade --install demo-app $(CHART_PATH) \
+                --set image.repository=$(IMAGE_NAME) \
+                --set image.tag=$(IMAGE_TAG) \
+                -n $(NAMESPACE)
+        @echo "Waiting for rollout..."
+        kubectl rollout status deployment/demo-app-demo-app -n $(NAMESPACE)
+
 
 # ---- Helm lifecycle ----
+
 install:
-	helm install demo-app $(CHART_PATH)
+        helm upgrade --install demo-app $(CHART_PATH) \
+                --set image.repository=$(IMAGE_NAME) \
+                --set image.tag=$(IMAGE_TAG) \
+                -n $(NAMESPACE)
 
 upgrade:
-	helm upgrade demo-app $(CHART_PATH)
+        helm upgrade demo-app $(CHART_PATH) \
+                --set image.repository=$(IMAGE_NAME) \
+                --set image.tag=$(IMAGE_TAG) \
+                -n $(NAMESPACE)
 
 uninstall:
-	helm uninstall demo-app || true
+        helm uninstall demo-app -n $(NAMESPACE) || true
 
 reinstall: uninstall install
 
+
 # ---- App inspection ----
+
 pods:
-	kubectl get pods -n $(NAMESPACE)
+        kubectl get pods -n $(NAMESPACE)
 
 svc:
-	kubectl get svc -n $(NAMESPACE)
+        kubectl get svc -n $(NAMESPACE)
 
 ingress:
-	kubectl get ingress -n $(NAMESPACE)
+        kubectl get ingress -n $(NAMESPACE)
 
 port-forward-app:
-	kubectl port-forward svc/demo-app-demo-app 8085:8085 -n $(NAMESPACE)
+        kubectl port-forward svc/demo-app-demo-app 8085:8085 -n $(NAMESPACE)
 
 curl-app:
-	curl http://localhost:8085/
-	@echo ""
-	curl http://localhost:8085/metrics
+        @echo "Testing application through Ingress..."
+        curl http://demo.local/
+        @echo ""
+        @echo "Testing application metrics through Ingress..."
+        curl http://demo.local/metrics
+
 
 # ---- Monitoring ----
+
 monitoring-namespace:
-	kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
 
 monitoring-install: monitoring-namespace
-	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
-	helm repo update
-	helm install monitoring prometheus-community/kube-prometheus-stack \
-	  -n monitoring -f monitoring/monitoring-values.yaml
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-ch>
+        helm repo update
+        helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+                -n monitoring \
+                -f monitoring/monitoring-values.yaml
 
 monitoring-uninstall:
-	helm uninstall monitoring -n monitoring || true
+        helm uninstall monitoring -n monitoring || true
 
 port-forward-prometheus:
-	kubectl port-forward svc/monitoring-kube-prometheus-prometheus -n monitoring 9091:9090
+        kubectl port-forward svc/monitoring-kube-prometheus-prometheus -n monitoring 9091>
 
 port-forward-grafana:
-	kubectl port-forward svc/monitoring-grafana -n monitoring 3001:80
+        kubectl port-forward svc/monitoring-grafana -n monitoring 3001:80
+
+
+# ---- Grafana dashboard ----
 
 dashboard-update:
         @echo "Regenerating ConfigMap from $(DASHBOARD_DIR)/$(DASHBOARD_NAME).json ..."
         kubectl create configmap $(DASHBOARD_NAME)-dashboard \
-          --from-file=$(DASHBOARD_DIR)/$(DASHBOARD_NAME).json \
-          -n monitoring --dry-run=client -o yaml | \
+                --from-file=$(DASHBOARD_DIR)/$(DASHBOARD_NAME).json \
+                -n monitoring \
+                --dry-run=client \
+                -o yaml | \
         kubectl label --local -f - grafana_dashboard="1" -o yaml \
-          > $(DASHBOARD_DIR)/$(DASHBOARD_NAME)-configmap.yaml
+                > $(DASHBOARD_DIR)/$(DASHBOARD_NAME)-configmap.yaml
         kubectl apply -f $(DASHBOARD_DIR)/$(DASHBOARD_NAME)-configmap.yaml
-        @echo "Done. Refresh Grafana in ~30-60s to see the update."
+        @echo "Done. Refresh Grafana in approximately 30 to 60 seconds."
 
 
-# ---- UAT environment ----
-uat-namespace:
-	kubectl create namespace uat --dry-run=client -o yaml | kubectl apply -f -
+# ---- Dynamic UAT environment ----
 
-uat-install: uat-namespace
-	helm install demo-app-uat $(CHART_PATH) -n uat -f $(CHART_PATH)/values-uat.yaml
+uat-install: push
+        @IMAGE_NAME="$(IMAGE_NAME)" IMAGE_TAG="$(IMAGE_TAG)" ./scripts/deploy-uat-env.sh
 
-uat-uninstall:
-	helm uninstall demo-app-uat -n uat || true
+uat-clean:
+        @if [ -z "$(ID)" ]; then \
+                echo "Usage: make uat-clean ID=<id>"; \
+                exit 1; \
+        fi
+        @./scripts/deploy-uat-env.sh --cleanup $(ID)
+
 
 # ---- Security scanning ----
+
 scan-image:
-	trivy image --severity HIGH,CRITICAL $(IMAGE_NAME):$(IMAGE_TAG)
+        trivy image --severity HIGH,CRITICAL $(IMAGE_NAME):$(IMAGE_TAG)
 
 scan-config:
-	trivy config $(CHART_PATH)/templates
+        trivy config $(CHART_PATH)/templates
 
 sbom:
-	mkdir -p reports
-	trivy image --format cyclonedx -o reports/docker-sbom.json $(IMAGE_NAME):$(IMAGE_TAG)
+        mkdir -p reports
+        trivy image \
+                --format cyclonedx \
+                -o reports/docker-sbom.json \
+                $(IMAGE_NAME):$(IMAGE_TAG)
+
 
 # ---- Full lifecycle shortcuts ----
+
 up: nodes monitoring-install install
-	@echo "Stack is up. Run 'make port-forward-app' or 'make port-forward-grafana' next."
+        @echo "Stack is up. Run 'make ingress' or 'make curl-app' to test the application>
 
 down: uninstall monitoring-uninstall
-	@echo "App and monitoring uninstalled."
+        @echo "App and monitoring uninstalled."
 
 status:
-	@echo "--- Nodes ---"
-	@sudo k3s kubectl get nodes
-	@echo "--- Helm releases ---"
-	@helm list -A
-	@echo "--- App pods ---"
-	@kubectl get pods -n $(NAMESPACE)
-	@echo "--- Monitoring pods ---"
-	@kubectl get pods -n monitoring
+        @echo "--- Nodes ---"
+        @sudo k3s kubectl get nodes
+        @echo "--- Helm releases ---"
+        @helm list -A
+        @echo "--- App pods ---"
+        @kubectl get pods -n $(NAMESPACE)
+        @echo "--- Monitoring pods ---"
+        @kubectl get pods -n monitoring
 
 clean: down
-	@echo "Cleaned up app and monitoring releases (namespaces left intact)."
+        @echo "Cleaned up app and monitoring releases. Namespaces remain intact."
+
 ```
 
 
