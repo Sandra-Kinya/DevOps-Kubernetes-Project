@@ -11,7 +11,7 @@ DASHBOARD_NAME := demo-app-overview
         pods svc ingress port-forward-app curl-app \
         monitoring-namespace monitoring-install monitoring-uninstall \
         port-forward-prometheus port-forward-grafana \
-        uat-namespace uat-install uat-uninstall \
+        uat-install uat-clean \
         scan-image scan-config sbom \
         up down status clean
 	dashboard-update
@@ -92,9 +92,11 @@ port-forward-app:
 	kubectl port-forward svc/demo-app-demo-app 8085:8085 -n $(NAMESPACE)
 
 curl-app:
-	curl http://localhost:8085/
+	@echo "Testing application through Ingress..."
+	curl http://demo.local/
 	@echo ""
-	curl http://localhost:8085/metrics
+	@echo "Testing application metrics..."
+	curl http://demo.local/metrics
 
 # ---- Monitoring ----
 monitoring-namespace:
@@ -126,15 +128,18 @@ dashboard-update:
 	@echo "Done. Refresh Grafana in ~30-60s to see the update."
 
 
-# ---- UAT environment ----
-uat-namespace:
-	kubectl create namespace uat --dry-run=client -o yaml | kubectl apply -f -
+# ---- Dynamic UAT environment ----
 
-uat-install: uat-namespace
-	helm install demo-app-uat $(CHART_PATH) -n uat -f $(CHART_PATH)/values-uat.yaml
+uat-install:
+	@./scripts/deploy-uat-env.sh
 
-uat-uninstall:
-	helm uninstall demo-app-uat -n uat || true
+uat-clean:
+	@if [ -z "$(ID)" ]; then \
+		echo "Usage: make uat-clean ID=<id>"; \
+		exit 1; \
+	fi
+	@./scripts/deploy-uat-env.sh --cleanup $(ID)
+
 
 # ---- Security scanning ----
 scan-image:
