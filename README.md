@@ -1,4 +1,4 @@
-# Local Kubernetes Cluster (k3s)
+# Deploying an app to a local K3s Cluster
 
 ## Deploying an app to a local K3s cluster --> package with Helm --> use Prometheus and Grafana for monitoring.
 This project demonstrates how to deploy a Flask application to a K3s cluster using Helm and implement monitoring.
@@ -60,7 +60,8 @@ Added .gitignore
 
 ### 3. CREATING THE FILE STRUCTURE
 
-<img width="1440" height="1600" alt="Detailed_project_architecture" src="https://github.com/user-attachments/assets/a8cb999a-d9b9-4569-b675-7e59818e8412" />
+<img width="456" height="972" alt="FileStructure" src="https://github.com/user-attachments/assets/82619092-ff43-48e3-91f9-e9e122ebf5f1" />
+
 
 
 ### 4: MODIFYING THE APP FILE
