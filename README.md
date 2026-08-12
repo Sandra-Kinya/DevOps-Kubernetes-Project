@@ -60,7 +60,7 @@ Added .gitignore
 
 ### 3. CREATING THE FILE STRUCTURE
 
-<img width="436" height="618" alt="FileStructure" src="https://github.com/user-attachments/assets/838ed19c-769c-4041-9136-60242ebd73bc" />
+<img width="1440" height="1600" alt="Detailed_project_architecture" src="https://github.com/user-attachments/assets/a8cb999a-d9b9-4569-b675-7e59818e8412" />
 
 
 ### 4: MODIFYING THE APP FILE
@@ -398,7 +398,8 @@ curl http://localhost:8085/
 curl http://localhost:8085/metrics
 ```
 
-<img width="1836" height="301" alt="demo local" src="https://github.com/user-attachments/assets/91fa6b23-9337-4360-bbac-123df069bd26" />
+<img width="1842" height="228" alt="Port-forwarding" src="https://github.com/user-attachments/assets/019400b2-8d62-423c-b756-c82ee807e8ec" />
+
 
 
 ### 13: Confirm the app responds via ingress
@@ -411,7 +412,11 @@ c) Test:
 curl http://demo.local/
 curl http://demo.local/metrics
 
-https://github.com/user-attachments/assets/f239abe3-2f23-48f7-968f-65f38d3f3e58
+
+
+https://github.com/user-attachments/assets/217f64f7-535d-4bec-8fff-292a802c40e6
+
+
 
 
 ## Monitoring
@@ -501,7 +506,8 @@ Delete pod and check if the alert fires
 ```bash
 kubectl delete pod -l app=demo-app -n default
 ```
-<img width="1833" height="702" alt="Prometheus_alerts" src="https://github.com/user-attachments/assets/d74e9ea1-7221-47b7-bf74-35bbb2374938" />
+<img width="1833" height="702" alt="Prometheus_alerts" src="https://github.com/user-attachments/assets/655bbd5f-33a4-46da-9f50-d9f220d7dc9d" />
+
 
 
 ### 16: Getting prometheus to scrap the application.
@@ -565,7 +571,8 @@ kubectl scale deployment demo-app-demo-app -n default --replicas=0
 kubectl scale deployment demo-app-demo-app -n default --replicas=1
 ```
 
-<img width="1833" height="940" alt="Prometheus_ScrapedData" src="https://github.com/user-attachments/assets/cc39bbf1-dba2-47c1-867d-ea3db662e295" />
+<img width="1833" height="940" alt="Prometheus_ScrapedData" src="https://github.com/user-attachments/assets/df4461f7-6f7e-41cf-833f-cdabdce04b39" />
+
 
 
 ### 17: BUILDING GRAFANA DASHBOARD**
@@ -592,7 +599,8 @@ Dashboards > New > Add visualization
 | Running Pods | `count(kube_pod_status_phase{namespace="default", phase="Running"})` |
 
 
-<img width="1833" height="940" alt="Grafana dashboard" src="https://github.com/user-attachments/assets/7b504d89-90d9-41ca-bf00-8ca9f2c9c5c4" />
+<img width="1842" height="1015" alt="GrafanaDashboard" src="https://github.com/user-attachments/assets/f794a893-cc38-4d7e-ad72-c8b0b193a198" />
+
 
 **17e) Creating grafana secret**
 
@@ -615,7 +623,10 @@ kubectl create secret generic grafana-admin-credentials \
 **Simulating self healing, scaling and errors**
 
 > Ran these commands and observe the changes on the dashboard in grafana
-> Find video attached
+
+> Self healing demonstration
+https://github.com/user-attachments/assets/eb6f4f57-cff6-4817-841a-d4094b7361d7
+
 
 
 ### 18: EXPORT GRAFANA DASHBOARDS AS JSON AND PROVISION VIA CONFIG-MAP 
@@ -741,7 +752,8 @@ kubectl get svc -n default
 
 > Any changes on app.py hence forth will require: docker build - docker push - kubectl delete pod.
 
-<img width="1838" height="817" alt="Docker_hub_repository" src="https://github.com/user-attachments/assets/74c2775c-c61d-414b-8312-1b7e609b9622" />
+<img width="1838" height="817" alt="Docker_hub_repository" src="https://github.com/user-attachments/assets/e35fb0c3-7665-4aee-97bf-3ed5c02ad084" />
+
 
 
 
@@ -1101,6 +1113,7 @@ clean: down
         @echo "Cleaned up app and monitoring releases. Namespaces remain intact."
 
 ```
+<img width="1836" height="727" alt="Makefile" src="https://github.com/user-attachments/assets/7d41ddc8-ecf1-49a9-86f4-ba223e016cf0" />
 
 
 ---
@@ -1130,8 +1143,6 @@ b) Kill pod: kubectl delete pod
 
 c) Immediately check pod status again: kubectl get pods
 A new pod appears automatically
-
-https://github.com/user-attachments/assets/d47d7a5f-a634-4505-8b06-a4de5fdcdf74
 
 
 ### 2. PRACTICE THE FULL HELM LIFECYCLE
@@ -1173,7 +1184,11 @@ g) Reinstall
 helm install demo-app
 kubectl get pods
 ```
-https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/1574b7d575fda566c5813f61ba2887b3a334388d/Implementation_videos/Helm_LifeCycle.mp4
+
+
+
+https://github.com/user-attachments/assets/78e526d1-a47d-449d-9d73-5a27eed8bea3
+
 
 
 ### 3. CHECKING RESOURCE UTILIZATION
@@ -1183,7 +1198,11 @@ I checked cluster and pod resource usage using the metrics-server bundled with k
 - **kubectl top pods -A** — per-pod usage across all namespaces
 - **kubectl top pod -n monitoring** — resource usage of the Prometheus/Grafana stack specifically
 
-https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/1574b7d575fda566c5813f61ba2887b3a334388d/Implementation_videos/ResourceUtilization.mp4
+
+
+https://github.com/user-attachments/assets/7a6ce475-7016-4353-b846-7cbd370087e2
+
+
 
 
 **I added CPU and memory requests and limits in deployment.yaml**.These should be added to prevent one workload from starving others of resources.
@@ -1221,17 +1240,24 @@ resources:
 - [x] Helm chart dependencies: none (standalone chart)
 - [x] kube-prometheus-stack: installed via prometheus-community Helm repo
 
-https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/1574b7d575fda566c5813f61ba2887b3a334388d/Implementation_videos/Versions.mp4
 
 **Namespace overview**
 I created a separate namespace for monitoring. *This is to provide isolation and clarity.*
 
-https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/1574b7d575fda566c5813f61ba2887b3a334388d/Implementation_videos/Namespaces.mp4
+
+
+https://github.com/user-attachments/assets/223ad9e8-91e9-4f43-9079-b05ed8e1363b
+
+
 
 **Persistent storage awareness**
 kube-prometheus-stack did not create persistent volumes therefore I added persistent storage (PVCs) to Prometheus and Grafana via a Helm values override, so metrics history and dashboards survive pod restarts or rescheduling instead of being lost with the default ephemeral storage.
 
-https://github.com/tcsdevopsintern/Sandra_tcs-devop-project-C/blob/1574b7d575fda566c5813f61ba2887b3a334388d/Implementation_videos/PersistentStorage.mp4
+
+
+https://github.com/user-attachments/assets/fc363969-4dd8-4906-8cdd-b6d4f96dc4ef
+
+
 
 
 ### 4. TEST SCALING
